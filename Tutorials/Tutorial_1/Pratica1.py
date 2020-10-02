@@ -5,14 +5,11 @@ Created on Thu Sep 24 12:14:26 2020
 
 @author: jamesark
 """
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
 
-
+"""
 def planet_period(planet):
-    """Return orbital period
-    Uses planets.csv
-    """
     lines = open('planets.csv').readlines()
     for line in lines:
         parts = line.split(',')
@@ -21,13 +18,12 @@ def planet_period(planet):
 
 
 def load_planet_data(file_name):
-    """Return matrix with orbital radius and period"""
     rows = []
     lines = open(file_name).readlines()
     for line in lines[1:]:
         parts = line.split(',')
         rows.append((float(parts[1]), float(parts[2])))
-    return numpy.array(rows)
+    return np.array(rows)
 
 
 def au_to_meters(value):
@@ -39,7 +35,7 @@ def earth_years_to_seconds(value):
 
 
 def getOrbitalVelocity(r, t):
-    return (2 * numpy.pi * r) / t
+    return (2 * np.pi * r) / t
 
 
 def getSunMass(v, r):
@@ -49,20 +45,20 @@ def getSunMass(v, r):
 
 # Exercise_1.5
 # -----------------------------------------------------------------------------------------SUN
-numpy.set_printoptions(precision=2)
+np.set_printoptions(precision=2)
 data = load_planet_data('planets.csv')
-data = numpy.array([au_to_meters(data[:, 0]), earth_years_to_seconds(data[:, 1])])
-data = numpy.array([data[0, :], getOrbitalVelocity(data[0, :], data[1, :])])
+data = np.array([au_to_meters(data[:, 0]), earth_years_to_seconds(data[:, 1])])
+data = np.array([data[0, :], getOrbitalVelocity(data[0, :], data[1, :])])
 sun_mass = getSunMass(data[1, :], data[0, :])
-data = numpy.array([numpy.mean(sun_mass), numpy.std(sun_mass)])
+data = np.array([np.mean(sun_mass), np.std(sun_mass)])
 print(data)
 
 # ----------------------------------------------------------------------------------------PLOT
 data2 = load_planet_data('planets.csv')
 x, y = (data2[:, 0], data2[:, 1])
-coefs = numpy.polyfit(x, y, 2)
-pxs = numpy.linspace(0, max(x))
-poly = numpy.polyval(coefs, pxs)
+coefs = np.polyfit(x, y, 2)
+pxs = np.linspace(0, max(x))
+poly = np.polyval(coefs, pxs)
 
 plt.figure(1, figsize=(12, 8), frameon=False)
 plt.plot(x, y, '.r')
@@ -70,4 +66,32 @@ plt.plot(pxs, poly, '-')
 plt.axis([0, max(x) + 10, -50, max(y) + 10])
 plt.title('Degree: 2')
 plt.savefig('1.5.png')
+plt.close()
+"""
+# Exercise_1.6
+
+data = np.loadtxt('polydata.csv', delimiter=";")
+x, y = (data[:, 0], data[:, 1])
+coefs3 = np.polyfit(x, y, 3)
+coefs15 = np.polyfit(x, y, 15)
+
+
+
+pxs = np.linspace(0, max(x), 100)
+
+poly3 = np.polyval(coefs3, pxs)
+poly15 = np.polyval(coefs15, pxs)
+
+plt.figure(1, figsize=(12, 8), frameon=False)
+
+plt.plot(x, y,'.r')
+plt.plot(pxs, poly3,'-')
+plt.plot(pxs, poly15,'-')
+plt.axis([0, max(x), -1.5, 1.5])
+
+plt.savefig("1.6.png")
+plt.show()
+
+print(coefs3)
+print(coefs15)
 plt.close()

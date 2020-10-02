@@ -1,4 +1,4 @@
-age	length
+age length
 1	67
 1	62
 2	109
