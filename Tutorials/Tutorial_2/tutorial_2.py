@@ -10,14 +10,12 @@ def random_split(data, test_points):
     test = data[ranks < test_points, :]
     return train, test
 
-def polyFit(degree,x,y,color):
+
+def polyFit(degree, x, y, color):
     coefs = np.polyfit(x, y, degree)
     pxs = np.linspace(0, max(x), 100)
     poly = np.polyval(coefs, pxs)
     plt.plot(pxs, poly, color)
-
-
-
 
 
 np.set_printoptions(precision=2)
@@ -32,31 +30,23 @@ means = np.mean(Ys)
 stdevs = np.std(Ys)
 Ys = (Ys - means) / stdevs
 
-
 data = np.array((Xs, Ys)).T
-#scale = np.max(data,axis=0)
-#data = data/scale  scale then expand check page 28 of lecture notes
+# scale = np.max(data,axis=0)
+# data = data/scale  scale then expand check page 28 of lecture notes
 train, temp = random_split(data, 39)
 valid, test = random_split(temp, 19)
 
 x, y = (train[:, 0], train[:, 1])
 plt.plot(x, y, '+r')
-plt.plot(valid[:, 0],valid[:, 0],'sg')
-plt.plot(test[:, 0],test[:, 0],'^b')
+plt.plot(valid[:, 0], valid[:, 0], 'sg')
+plt.plot(test[:, 0], test[:, 0], '^b')
 plt.figure(1, figsize=(12, 8), frameon=False)
 plt.axis([-3, 3, -4, 2])
 plt.title("Blue gill size")
 
-
-colors = ['-b','-r','-g','-c','-y','-m']
+colors = ['-b', '-r', '-g', '-c', '-y', '-m']
 for degree in range(1, 7):
-    polyFit(degree, x, y, colors[degree-1])
+    polyFit(degree, x, y, colors[degree - 1])
 plt.show()
 
-
-
-
-
-
-#train, temp = random_split(data, )
-
+# train, temp = random_split(data, )
