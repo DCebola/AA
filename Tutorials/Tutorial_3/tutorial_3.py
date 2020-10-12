@@ -29,12 +29,12 @@ Xs = (Xs - means) / stdevs
 Xs = t3_aux.poly_16features(Xs)
 X_r, X_t, Y_r, Y_t = train_test_split(Xs, Ys, test_size=0.33, stratify=Ys)
 
-'''
+
 folds = 10
 best_feat = 0
 best_val_err = 1000000
 kf = StratifiedKFold(n_splits=folds)
-errors = np.zeros((13,2))
+errors = np.zeros((14,2))
 for feats in range(2,16):
     tr_err = va_err = 0
     for tr_ix,va_ix in kf.split(Y_r,Y_r):
@@ -46,7 +46,7 @@ for feats in range(2,16):
         best_feat = feats
     print(feats,':', tr_err/folds,va_err/folds)
     errors[feats-2,:] = errors[feats-2,:] + (tr_err/folds,va_err/folds)
-    
+
 
 t3_aux.create_plot(X_r, Y_r, X_t, Y_t, best_feat,1e12)
 '''
@@ -76,7 +76,6 @@ for i in range(1, 21):
         best_c = c
     c = c * 2
 
-pxs = np.linspace(min(logCToValErr[:, 0]), max(logCToValErr[:, 0]), 100)
 max_y = max([max(logCToValErr[:, 1]), max(logCToTrainErr[:, 1])])
 plt.axis([1, 16, 0, max_y])
 
@@ -84,4 +83,4 @@ plt.plot(logCToTrainErr[:, 0], logCToTrainErr[:, 1], '-b')
 plt.plot(logCToValErr[:, 0], logCToValErr[:, 1], '-r')
 
 plt.show()
-# t3_aux.create_plot(X_r, Y_r, X_t, Y_t,16,best_c)
+t3_aux.create_plot(X_r, Y_r, X_t, Y_t,16,best_c)'''
