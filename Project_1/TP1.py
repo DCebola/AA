@@ -33,17 +33,19 @@ MAX_KDE = 0.6
 FEATS = 4
 
 
-def standardize(_data):
-    features = _data[:, 0:4]
-    classes = _data[:, 4]
-    f_means = np.mean(features)
-    f_std = np.std(features)
-    features = (features - f_means) / f_std
-    return np.column_stack((features, classes))
+def standardize(_train_data, _test_data):
+    _train_features = _train_data[:, 0:4]
+    _train_classes = _train_data[:, 4]
+    _test_features = _test_data[:, 0:4]
+    _test_classes = _test_data[:, 4]
+    f_means = np.mean(_train_features)
+    f_std = np.std(_train_features)
+    _train_features = (_train_features - f_means) / f_std
+    _test_features = (_test_features - f_means) / f_std
+    return np.column_stack((_train_features, _train_classes)), np.column_stack((_test_features, _test_classes))
 
 
 def calc_fold(X, Y, train_ix, valid_ix, C):
-    """return error for train and validation sets"""
     reg = LogisticRegression(C=C, tol=1e-10)
     reg.fit(X[train_ix, :FEATS], Y[train_ix])
     prob = reg.predict_proba(X[:, :FEATS])[:, 1]
@@ -51,25 +53,29 @@ def calc_fold(X, Y, train_ix, valid_ix, C):
     return np.mean(squares[train_ix]), np.mean(squares[valid_ix])
 
 
+def logistic_regression(_train_data, ):
+    best_val_err = 100000000
+    kf = StratifiedKFold(n_splits=FOLDS)
+    best_exp = -3
+    for exp in range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1):
+        tr_err = va_err = 0
+        for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
+            fold_t_err, fold_v_err = calc_fold(_train_data[:, 0:4], _train_data[:, 4], tr_ix, va_ix, 10 ** exp)
+            tr_err += fold_t_err
+            va_err += fold_v_err
+        if va_err / FOLDS < best_val_err:
+            best_val_err = va_err / FOLDS
+            best_exp = exp
+    return 10**best_exp
+
+
+def custom_naive_bayes(kde, _train_data):
+    pass
+
+
 np.set_printoptions(precision=4)
 test_data = np.loadtxt('TP1_test.tsv')
 train_data = np.loadtxt('TP1_train.tsv')
-train_data = standardize(shuffle(train_data))
-test_data = standardize(shuffle(test_data))
+train_data, test_data = standardize(shuffle(train_data), shuffle(test_data))
 
-best_val_err = 100000000
-kf = StratifiedKFold(n_splits=FOLDS)
-best_exp = -3
-print(train_data)
-for exp in range(MIN_C_EXPONENT,MAX_C_EXPONENT+1):
-    tr_err = va_err = 0
-    for tr_ix, va_ix in kf.split(train_data[:, 4], train_data[:, 4]):
-        fold_t_err, fold_v_err = calc_fold(train_data[:, 0:4], train_data[:, 4], tr_ix, va_ix, 10**exp)
-        tr_err += fold_t_err
-        va_err += fold_v_err
-    if va_err / FOLDS < best_val_err:
-        best_val_err = va_err / FOLDS
-        best_exp = exp
-
-c = 10**best_exp
-print(str("{:.2e}".format(c)))
+c = logistic_regression(train_data)
