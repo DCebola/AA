@@ -1,22 +1,22 @@
 # TODO: Three Classifiers:
-# Logistic Regression
-# find the best value for the regularization parameter C
-# C is in [1e-2, 1e12] each step is *10 (1e-2 ,1e-1 ,1e0,...)
-# plot of cross-validation and training errors for the C parameter
-# ---------------------------
-# Custom Naive Bayes classifier using Kernel Density Estimation
-# Kernel Density Estimation for the probability distributions of the feature values
-# Use the KernelDensity class from sklearn.neighbors.kde for the density estimation
-# KDE is in [0.02,0.6] each step is +0.02
-# Accuracy is measured by accuracy_score (sklearn.metrics.accuracy_score)
-# find the optimum value for the bandwitdh parameter of the kernel density estimators
-# plot of training and cross-validation errors for the KDE kernel
-# ---------------------------
-# Gaussian Naive Bayes classifier in the sklearn.naive_bayes.GaussianNB class
-# ---------------------------
-# Cross Validation each classifier with 5 folds
-# Compare all classifiers, identify the best one and discuss if it is significantly better than the others
-# For comparing the classifiers, use the approximate normal test and McNemar's test, both with a 95% confidence interval
+#  Logistic Regression
+#  find the best value for the regularization parameter C
+#  C is in [1e-2, 1e12] each step is *10 (1e-2 ,1e-1 ,1e0,...)
+#  plot of cross-validation and training errors for the C parameter
+#  ---------------------------
+#  Custom Naive Bayes classifier using Kernel Density Estimation
+#  Kernel Density Estimation for the probability distributions of the feature values
+#  Use the KernelDensity class from sklearn.neighbors.kde for the density estimation
+#  KDE is in [0.02,0.6] each step is +0.02
+#  Accuracy is measured by accuracy_score (sklearn.metrics.accuracy_score)
+#  find the optimum value for the bandwitdh parameter of the kernel density estimators
+#  plot of training and cross-validation errors for the KDE kernel
+#  ---------------------------
+#  Gaussian Naive Bayes classifier in the sklearn.naive_bayes.GaussianNB class
+#  ---------------------------
+#  Cross Validation each classifier with 5 folds
+#  Compare all classifiers, identify the best one and discuss if it is significantly better than the others
+#  For comparing the classifiers, use the approximate normal test and McNemar's test, both with a 95% confidence interval
 
 
 import numpy as np
@@ -49,7 +49,7 @@ def standardize(_train_data, _test_data):
 
 def calc_fold_logistic(x, y, train_ix, valid_ix, _c):
     reg = LogisticRegression(C=_c, tol=1e-10)
-    reg.fit(x[train_ix, :FEATS], y[train_ix])
+    reg.fit(x[train_ix], y[train_ix])
     squares = (reg.predict_proba(x[:, :FEATS])[:, 1] - y) ** 2
     return np.mean(squares[train_ix]), np.mean(squares[valid_ix])
 
@@ -70,11 +70,43 @@ def logistic_regression(_train_data, kf):
 
 
 def calc_fold_bayes(x, y, train_ix, valid_ix, __h):
-    kde = KernelDensity(bandwidth=__h)
-    kde.fit(x[train_ix, :FEATS])
-    log = kde.score_samples(np.linspace())
-    print(log)
-    return np.mean(squares[train_ix]), np.mean(squares[valid_ix])
+    kde_1 = KernelDensity(bandwidth=__h)
+    kde_0 = KernelDensity(bandwidth=__h)
+    # for the fold selected points we need to train the KDE for each class,  meaning for all points that belong to
+    # one class are needed to fit kde.fit([points of class 1]) and kde.fit([points fo class 2])
+    #
+    class1_train_points, class0_train_points = separate_classes(x, y, train_ix)
+
+    class1_valid_test_points, class0_valid_test_points = separate_classes(x, y, valid_ix)
+    kde_0.fit(class0_train_points)
+    kde_1.fit(class1_train_points)
+    print("x[train_ix]")
+    print(x[train_ix])
+    print("class0")
+    print(class0_train_points)
+    logs_class0 = kde_0.score_samples(class0_valid_test_points)
+    class0_log = len(class0_valid_test_points[0 ])/len(valid_ix)
+    logs_class1 = kde_1.score_samples(class1_valid_test_points)
+
+
+    return 0, 0
+
+
+def separate_classes(x, y, indexes):
+    class1 = np.zeros((int(sum(y[indexes])), x[indexes].shape[1]))
+    class0 = np.zeros((len(y[indexes])-int(sum(y[indexes])), x[indexes].shape[1]))
+    print(class1.shape)
+    print(class0.shape)
+    counter = 0
+    indexed_x = x[indexes]
+    indexed_y = y[indexes]
+    for value in indexed_y:
+        if value == 0:
+            class0[counter, :] = class0[counter, :] + indexed_x[counter]
+        else:
+            class1[counter, :] = class1[counter, :] + indexed_x[counter]
+        counter = counter + 1
+    return class0, class1
 
 
 def custom_naive_bayes(_train_data, kf):
