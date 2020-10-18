@@ -73,14 +73,14 @@ def classify(features_class0, log_class0, features_class1, log_class1, indexes):
     return classes
 
 
-def calc_fold_logistic(x, y, train_ix, valid_ix, _c):
+def logistic_regression(x, y, train_ix, valid_ix, _c):
     reg = LogisticRegression(C=_c, tol=1e-10)
     reg.fit(x[train_ix], y[train_ix])
     squares = (reg.predict_proba(x[:, :FEATS])[:, 1] - y) ** 2
-    return np.mean(squares[train_ix]), np.mean(squares[valid_ix])
+    return np.mean(squares[valid_ix])  # , np.mean(squares[train_ix])
 
 
-def calc_fold_bayes(x, y, train_ix, valid_ix, _h):
+def custom_naive_bayes(x, y, train_ix, valid_ix, _h):
     kde_1 = KernelDensity(bandwidth=_h)
     kde_0 = KernelDensity(bandwidth=_h)
 
@@ -124,8 +124,9 @@ def calc_fold_bayes(x, y, train_ix, valid_ix, _h):
     return error_percentage
 
 
-def logistic_regression(_train_data, kf):
-    best_val_err = 100000000
+'''
+def logistic_regression(_train_data, kf, foo):
+   best_val_err = 100000000
     best_exp = -3
     for exp in range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1):
         tr_err = va_err = 0
@@ -136,8 +137,9 @@ def logistic_regression(_train_data, kf):
         if va_err / FOLDS < best_val_err:
             best_val_err = va_err / FOLDS
             best_exp = exp
+    
     return 10 ** best_exp
-
+   
 
 def custom_naive_bayes(_train_data, kf):
     best_val_err = 100000000
@@ -152,6 +154,21 @@ def custom_naive_bayes(_train_data, kf):
             best_val_err = va_err / FOLDS
             best_h = _h
     return best_h
+'''
+
+
+def cross_validation(_train_data, p_values, calc_fold, kf):
+    best_val_err = 100000000
+    best_p = -1
+    for p in p_values:
+        va_err = 0
+        for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
+            fold_v_err = calc_fold(_train_data[:, 0:4], _train_data[:, 4], tr_ix, va_ix, p)
+            va_err += fold_v_err
+        if va_err / FOLDS < best_val_err:
+            best_val_err = va_err / FOLDS
+            best_p = p
+    return best_p
 
 
 def gaussian_naive_bayes(_train_data, _test_data):
@@ -160,11 +177,11 @@ def gaussian_naive_bayes(_train_data, _test_data):
     return clf.score(_test_data[:, 0:4], _test_data[:, 4])
 
 
-def mcnemars_test():
+def approximate_normal_test():
     pass
 
 
-def approximate_normal_test():
+def mcnemars_test():
     pass
 
 
@@ -174,6 +191,6 @@ train_data = np.loadtxt('TP1_train.tsv')
 train_data, test_data = standardize(shuffle(train_data), shuffle(test_data))
 
 folds = StratifiedKFold(n_splits=FOLDS)
-print(logistic_regression(train_data, folds))
-print(custom_naive_bayes(train_data, folds))
+cross_validation(train_data, map(lambda x: 10 ** x, range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1)), logistic_regression, folds)
+cross_validation(train_data, map(lambda x: x / 100, range(MIN_KDE, MAX_KDE, KDE_STEP)), custom_naive_bayes, folds)
 print(gaussian_naive_bayes(train_data, test_data))
