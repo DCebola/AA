@@ -142,8 +142,8 @@ def logistic_regression(_train_data, kf):
 def custom_naive_bayes(_train_data, kf):
     best_val_err = 100000000
     best_h = -1
-    h_values = map(lambda x: x / 100.0, range(MIN_KDE, MAX_KDE, KDE_STEP))
-    for _h in h_values:
+    for _h in range(MIN_KDE, MAX_KDE, KDE_STEP):
+        _h = _h / 100.0
         va_err = 0
         for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
             fold_v_err = calc_fold_bayes(_train_data[:, 0:4], _train_data[:, 4], tr_ix, va_ix, _h)
@@ -177,4 +177,3 @@ folds = StratifiedKFold(n_splits=FOLDS)
 print(logistic_regression(train_data, folds))
 print(custom_naive_bayes(train_data, folds))
 print(gaussian_naive_bayes(train_data, test_data))
-
