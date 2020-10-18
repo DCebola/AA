@@ -20,6 +20,7 @@
 
 
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
@@ -35,6 +36,19 @@ MIN_KDE = 2
 MAX_KDE = 60
 FEATS = 4
 
+
+def plot_errs(x, y_train, y_valid, title, x_title,filename):
+    fig, ax = plt.subplots(figsize=(19, 10))
+
+    ax.plot(x, y_train, '-r')
+    ax.plot(x, y_valid, '-b')
+
+    ax.set_title(title)
+    ax.set_xlabel(x_title)
+    ax.legend(['train_error', 'validation_error'])
+    plt.savefig(filename)
+    plt.show()
+    plt.close(fig)
 
 def standardize(_train_data, _test_data):
     _train_features = _train_data[:, 0:4]
@@ -123,15 +137,23 @@ def custom_naive_bayes(_train_data, _test_data, _h):
 def cross_validation(_train_data, p_values, clf_function, kf):
     best_val_err = 100000000
     best_p = -1
+    tr_errs = np.zeros((len(p_values),))
+    va_errs = np.zeros((len(p_values),))
+    counter = 0
     for p in p_values:
         va_err = 0
+        tr_err = 0
         for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
-            fold_t_err, fold_v_err = clf_function(_train_data[tr_ix], _train_data[va_ix], p)
-            va_err += fold_v_err
+            fold_train_err, fold_va_err = clf_function(_train_data[tr_ix], _train_data[va_ix], p)
+            va_err += fold_va_err
+            tr_err += fold_train_err
+        tr_errs[counter] = tr_err / FOLDS
+        va_errs[counter] = va_err / FOLDS
+        counter += 1
         if va_err / FOLDS < best_val_err:
             best_val_err = va_err / FOLDS
             best_p = p
-    return best_p
+    return best_p, tr_errs, va_errs
 
 
 def gaussian_naive_bayes(_train_data, _test_data):
@@ -144,7 +166,7 @@ def approximate_normal_test():
     pass
 
 
-def mcnemars_test():
+def mc_nemars_test():
     pass
 
 
@@ -154,6 +176,17 @@ train_data = np.loadtxt('TP1_train.tsv')
 train_data, test_data = standardize(shuffle(train_data), shuffle(test_data))
 
 folds = StratifiedKFold(n_splits=FOLDS)
-print(cross_validation(train_data, map(lambda x: 10 ** x, range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1)), logistic_regression, folds))
-print(cross_validation(train_data, map(lambda x: x / 100, range(MIN_KDE, MAX_KDE, KDE_STEP)), custom_naive_bayes, folds))
+
+c_values = list(map(lambda x: 10 ** x, range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1)))
+h_values = list(map(lambda x: x / 100, range(MIN_KDE, MAX_KDE, KDE_STEP)))
+
+c, c_tr_errs, c_va_errs = cross_validation(train_data, c_values, logistic_regression, folds)
+h, h_tr_errs, h_va_errs = cross_validation(train_data, h_values, custom_naive_bayes, folds)
+
+plot_errs(np.log10(c_values), c_tr_errs, c_va_errs, 'Logistic Regression', ' c value as 10 to the power of', "LR.png")
+plot_errs(h_values, h_tr_errs, h_va_errs, 'KDE based Naive Bayes', 'h value: bandwidth', "NB.png")
+
+
+print(c)
+print(h)
 print(gaussian_naive_bayes(train_data, test_data))
