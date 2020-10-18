@@ -48,71 +48,52 @@ def standardize(_train_data, _test_data):
     return np.column_stack((_train_features, _train_classes)), np.column_stack((_test_features, _test_classes))
 
 
-def separate_classes(x, y, indexes):
-    indexed_x = x[indexes]
-    indexed_y = y[indexes]
-    class1 = indexed_x[np.where(indexed_y == 1)]
-    class0 = indexed_x[np.where(indexed_y == 0)]
-
-    return class0, class1
-
-
-def get_score(predicted, mask, n=False):
-    return accuracy_score(predicted, mask, normalize=n)
-
-
-def classify(features_class0, log_class0, features_class1, log_class1, indexes):
-    classes = np.zeros((len(indexes[0]),))
-    to_classify_class0 = features_class0[indexes]
-    to_classify_class1 = features_class1[indexes]
-    for row in range(to_classify_class0.shape[0]):
-        class0_sum = log_class0 + to_classify_class0[row]
-        class1_sum = log_class1 + to_classify_class1[row]
-        if class0_sum < class1_sum:
-            classes[row] = 1
-    return classes
-
-
-def logistic_regression(x, y, train_ix, valid_ix, _c):
+def logistic_regression(_train_data, _test_data, _c):
     reg = LogisticRegression(C=_c, tol=1e-10)
-    reg.fit(x[train_ix], y[train_ix])
-    squares = (reg.predict_proba(x[:, :FEATS])[:, 1] - y) ** 2
-    return np.mean(squares[valid_ix])  # , np.mean(squares[train_ix])
+    reg.fit(_train_data[:, 0:FEATS], _train_data[:, FEATS])
+    squares_train = (reg.predict_proba(_train_data[:, :FEATS])[:, 1] - _train_data[:, FEATS]) ** 2
+    squares_test = (reg.predict_proba(_test_data[:, :FEATS])[:, 1] - _test_data[:, FEATS]) ** 2
+    return np.mean(squares_train), np.mean(squares_test)
 
 
-def custom_naive_bayes(x, y, train_ix, valid_ix, _h):
-    kde_1 = KernelDensity(bandwidth=_h)
-    kde_0 = KernelDensity(bandwidth=_h)
+def custom_naive_bayes(_train_data, _test_data, _h):
+    def separate_classes(feats, Ys):
+        class1 = feats[np.where(Ys == 1)]
+        class0 = feats[np.where(Ys == 0)]
 
-    class0_train_points, class1_train_points = separate_classes(x, y, train_ix)
-    class0_valid_test_points, class1_valid_test_points = separate_classes(x, y, valid_ix)
+        return class0, class1
 
-    kde_0.fit(class0_train_points)
-    kde_1.fit(class1_train_points)
+    def get_score(predicted, mask, n=False):
+        return accuracy_score(predicted, mask, normalize=n)
 
-    valid_feats = x[valid_ix]
-    valid_point_classes = y[valid_ix]
+    def classify(features_class0, log_class0, features_class1, log_class1, indexes):
+        classes = np.zeros((len(indexes[0]),))
+        to_classify_class0 = features_class0[indexes]
+        to_classify_class1 = features_class1[indexes]
+        for row in range(to_classify_class0.shape[0]):
+            class0_sum = log_class0 + to_classify_class0[row]
+            class1_sum = log_class1 + to_classify_class1[row]
+            if class0_sum < class1_sum:
+                classes[row] = 1
+        return classes
 
-    log_features_class0 = kde_0.score_samples(valid_feats)
-    log_features_class1 = kde_1.score_samples(valid_feats)
+    def custom_naive_bayes_score(data_set, log_features_class0, log_features_class1):
 
-    total_len = log_features_class1.shape[0] + log_features_class0.shape[0]
-    class0_log = np.log(class0_valid_test_points.shape[0] / total_len)
-    class1_log = np.log(class1_valid_test_points.shape[0] / total_len)
+        total_len = log_features_class1.shape[0] + log_features_class0.shape[0]
+        class0_log = np.log(class0_valid_test_points.shape[0] / total_len)
+        class1_log = np.log(class1_valid_test_points.shape[0] / total_len)
 
-    classed_0 = classify(log_features_class0, class0_log, log_features_class1,
-                         class1_log, np.where(valid_point_classes == 0))
-    classed_1 = classify(log_features_class0, class0_log, log_features_class1,
-                         class1_log, np.where(valid_point_classes == 1))
+        classed_0 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(data_set[:, FEATS] == 0))
+        classed_1 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(data_set[:, FEATS] == 1))
 
-    predicted = np.append(classed_0, classed_1)
-    hit_mask = np.append(np.zeros(classed_0.shape), np.ones(classed_1.shape))
-    error_mask = np.append(np.ones(classed_0.shape), np.zeros(classed_1.shape))
-    hits = get_score(predicted, hit_mask)
-    hit_percentage = get_score(predicted, hit_mask, True) * 100
-    errors = get_score(predicted, error_mask)
-    error_percentage = get_score(predicted, error_mask, True) * 100
-
+        predicted = np.append(classed_0, classed_1)
+        hit_mask = np.append(np.zeros(classed_0.shape), np.ones(classed_1.shape))
+        error_mask = np.append(np.ones(classed_0.shape), np.zeros(classed_1.shape))
+        hits = get_score(predicted, hit_mask)
+        hit_percentage = get_score(predicted, hit_mask, True) * 100
+        errors = get_score(predicted, error_mask)
+        error_percentage = get_score(predicted, error_mask, True) * 100
+        return error_percentage
     '''
     print("________________________")
     print('Hits: ' + str(hits))
@@ -121,49 +102,31 @@ def custom_naive_bayes(x, y, train_ix, valid_ix, _h):
     print('Error %: ' + str(error_percentage))
     print("________________________")
     '''
-    return error_percentage
+    kde_1 = KernelDensity(bandwidth=_h)
+    kde_0 = KernelDensity(bandwidth=_h)
+
+    class0_train_points, class1_train_points = separate_classes(_train_data[:, 0:FEATS], _train_data[:, FEATS])
+    class0_valid_test_points, class1_valid_test_points = separate_classes(_test_data[:, 0:FEATS], _test_data[:, FEATS])
+
+    kde_0.fit(class0_train_points)
+    kde_1.fit(class1_train_points)
+    train_log_features_class0 = kde_0.score_samples(_train_data[:, 0: FEATS])
+    train_log_features_class1 = kde_1.score_samples(_train_data[:, 0: FEATS])
+    test_log_features_class0 = kde_0.score_samples(_test_data[:, 0: FEATS])
+    test_log_features_class1 = kde_1.score_samples(_test_data[:, 0: FEATS])
+
+    return\
+        custom_naive_bayes_score(_train_data, train_log_features_class0, train_log_features_class1),\
+        custom_naive_bayes_score(_test_data, test_log_features_class0, test_log_features_class1)
 
 
-'''
-def logistic_regression(_train_data, kf, foo):
-   best_val_err = 100000000
-    best_exp = -3
-    for exp in range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1):
-        tr_err = va_err = 0
-        for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
-            fold_t_err, fold_v_err = calc_fold_logistic(_train_data[:, 0:4], _train_data[:, 4], tr_ix, va_ix, 10 ** exp)
-            tr_err += fold_t_err
-            va_err += fold_v_err
-        if va_err / FOLDS < best_val_err:
-            best_val_err = va_err / FOLDS
-            best_exp = exp
-    
-    return 10 ** best_exp
-   
-
-def custom_naive_bayes(_train_data, kf):
-    best_val_err = 100000000
-    best_h = -1
-    for _h in range(MIN_KDE, MAX_KDE, KDE_STEP):
-        _h = _h / 100.0
-        va_err = 0
-        for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
-            fold_v_err = calc_fold_bayes(_train_data[:, 0:4], _train_data[:, 4], tr_ix, va_ix, _h)
-            va_err += fold_v_err
-        if va_err / FOLDS < best_val_err:
-            best_val_err = va_err / FOLDS
-            best_h = _h
-    return best_h
-'''
-
-
-def cross_validation(_train_data, p_values, calc_fold, kf):
+def cross_validation(_train_data, p_values, clf_function, kf):
     best_val_err = 100000000
     best_p = -1
     for p in p_values:
         va_err = 0
         for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
-            fold_v_err = calc_fold(_train_data[:, 0:4], _train_data[:, 4], tr_ix, va_ix, p)
+            fold_t_err, fold_v_err = clf_function(_train_data[tr_ix], _train_data[va_ix], p)
             va_err += fold_v_err
         if va_err / FOLDS < best_val_err:
             best_val_err = va_err / FOLDS
@@ -191,6 +154,6 @@ train_data = np.loadtxt('TP1_train.tsv')
 train_data, test_data = standardize(shuffle(train_data), shuffle(test_data))
 
 folds = StratifiedKFold(n_splits=FOLDS)
-cross_validation(train_data, map(lambda x: 10 ** x, range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1)), logistic_regression, folds)
-cross_validation(train_data, map(lambda x: x / 100, range(MIN_KDE, MAX_KDE, KDE_STEP)), custom_naive_bayes, folds)
+print(cross_validation(train_data, map(lambda x: 10 ** x, range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1)), logistic_regression, folds))
+print(cross_validation(train_data, map(lambda x: x / 100, range(MIN_KDE, MAX_KDE, KDE_STEP)), custom_naive_bayes, folds))
 print(gaussian_naive_bayes(train_data, test_data))
