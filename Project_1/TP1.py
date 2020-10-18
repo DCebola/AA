@@ -56,88 +56,16 @@ def separate_classes(x, y, indexes):
     return class0, class1
 
 
-def kde_score(fit_x, score_x, _h):
-    kde = KernelDensity(bandwidth=_h)
-    kde.fit(fit_x)
-    return np.array(kde.score_samples(score_x))
-
-
-def calc_feat_log_class(feat, class_tr, class_va, _h):
-    class_tr_feat = np.array(class_tr[:, feat]).reshape(-1, 1)
-    class_va_feat = np.array(class_va[:, feat]).reshape(-1, 1)
-
-    return kde_score(class_tr_feat, class_va_feat, _h)
-
-
-''' def classify(features_class0, log_class0, features_class1, log_class1, feat_mat):
-    classes = np.zeros(feat_mat.shape[0])
-    for point in range(feat_mat.shape[0]):
-        class0_sum = log_class0 + features_class0[point]
-        class1_sum = log_class1 + features_class1[point]
-        if class0_sum < class1_sum:
-            classes[point] = 1
-    return classes'''
-
-
-def classify(feat_logs_class0, class0_log, feat_logs_class1, class1_log, indexes):
+def classify(features_class0, log_class0, features_class1, log_class1, indexes):
     classes = np.zeros((len(indexes[0]),))
-
-    counter = 0
-    for row in indexes:
-        class0_sum = class0_log
-        class1_sum = class1_log
-        for column in range(feat_logs_class0.shape[1]):
-            class0_sum = class0_sum + feat_logs_class0[row, :][0, column]
-            class1_sum = class1_sum + feat_logs_class1[row, :][0, column]
+    to_classify_class0 = features_class0[indexes]
+    to_classify_class1 = features_class1[indexes]
+    for row in range(to_classify_class0.shape[0]):
+        class0_sum = log_class0 + to_classify_class0[row]
+        class1_sum = log_class1 + to_classify_class1[row]
         if class0_sum < class1_sum:
-            classes[counter] = 1
-        counter = counter + 1
+            classes[row] = 1
     return classes
-
-
-def obtain_feature_log(x, y, train_ix, valid_ix, _h):
-
-    class0_tr_feats, class1_tr_feats = separate_classes(x, y, train_ix)
-    test_feats = x[valid_ix]
-
-    feat_logs_class0 = np.zeros(test_feats.shape)
-    feat_logs_class1 = np.zeros(test_feats.shape)
-
-    # FEATURE 0
-
-    feat_logs_class0[:, 0] = feat_logs_class0[:, 0] + calc_feat_log_class(0, class0_tr_feats, test_feats, _h)
-    # ==========================================================================================
-    #  CLASS 0 ABOVE || CLASS 1 BELOW
-    # ==========================================================================================
-
-    feat_logs_class1[:, 0] = feat_logs_class1[:, 0] + calc_feat_log_class(0, class1_tr_feats, test_feats, _h)
-    # FEATURE 0
-
-    # FEATURE 1
-    feat_logs_class0[:, 1] = feat_logs_class0[:, 1] + calc_feat_log_class(1, class0_tr_feats, test_feats, _h)
-    # ==========================================================================================
-    #  CLASS 0 ABOVE || CLASS 1 BELOW
-    # ==========================================================================================
-    feat_logs_class1[:, 1] = feat_logs_class1[:, 1] + calc_feat_log_class(1, class1_tr_feats, test_feats, _h)
-    # FEATURE 1
-
-    # FEATURE 2
-    feat_logs_class0[:, 2] = feat_logs_class0[:, 2] + calc_feat_log_class(2, class0_tr_feats, test_feats, _h)
-    # ==========================================================================================
-    #  CLASS 0 ABOVE || CLASS 1 BELOW
-    # ==========================================================================================
-    feat_logs_class1[:, 2] = feat_logs_class1[:, 2] + calc_feat_log_class(2, class1_tr_feats, test_feats, _h)
-    # FEATURE 2
-
-    # FEATURE 3
-    feat_logs_class0[:, 3] = feat_logs_class0[:, 3] + calc_feat_log_class(3, class0_tr_feats, test_feats, _h)
-    # ==========================================================================================
-    #  CLASS 0 ABOVE || CLASS 1 BELOW
-    # ==========================================================================================
-    feat_logs_class1[:, 3] = feat_logs_class1[:, 3] + calc_feat_log_class(3, class1_tr_feats, test_feats, _h)
-    # FEATURE 3
-
-    return feat_logs_class0, feat_logs_class1
 
 
 def calc_fold_logistic(x, y, train_ix, valid_ix, _c):
@@ -149,41 +77,31 @@ def calc_fold_logistic(x, y, train_ix, valid_ix, _c):
 
 def calc_fold_bayes(x, y, train_ix, valid_ix, _h):
 
-    '''
     kde_1 = KernelDensity(bandwidth=_h)
-        kde_0 = KernelDensity(bandwidth=_h)
+    kde_0 = KernelDensity(bandwidth=_h)
 
-        class0_train_points, class1_train_points = separate_classes(x, y, train_ix)
-        class0_valid_test_points, class1_valid_test_points = separate_classes(x, y, valid_ix)
+    class0_train_points, class1_train_points = separate_classes(x, y, train_ix)
+    class0_valid_test_points, class1_valid_test_points = separate_classes(x, y, valid_ix)
 
-        kde_0.fit(class0_train_points)
-        kde_1.fit(class1_train_points)
+    kde_0.fit(class0_train_points)
+    kde_1.fit(class1_train_points)
 
-        log_features_class0 = kde_0.score_samples(x[valid_ix])
-        log_features_class1 = kde_1.score_samples(x[valid_ix])
+    valid_feats = x[valid_ix]
+    valid_point_classes = y[valid_ix]
 
-        total_len = log_features_class1.shape[0] + log_features_class0.shape[0]
-        class0_log = class0_valid_test_points.shape[0] / total_len
-        class1_log = class1_valid_test_points.shape[0] / total_len
+    log_features_class0 = kde_0.score_samples(valid_feats)
+    log_features_class1 = kde_1.score_samples(valid_feats)
 
-        classed_0 = classify(log_features_class0, class0_log, log_features_class1, class1_log, class0_valid_test_points)
-        classed_1 = classify(log_features_class0, class0_log, log_features_class1, class1_log, class1_valid_test_points)
+    total_len = log_features_class1.shape[0] + log_features_class0.shape[0]
+    class0_log = np.log(class0_valid_test_points.shape[0] / total_len)
+    class1_log = np.log(class1_valid_test_points.shape[0] / total_len)
 
-        errors = sum(classed_0) + sum(1 - classed_1)
-        error_percent = float(errors) / (len(classed_0) + len(classed_1)) * 100
-        return error_percent
-    '''
+    classed_0 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(valid_point_classes == 0))
+    classed_1 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(valid_point_classes == 1))
 
-    feat_logs_class0, feat_logs_class1 = obtain_feature_log(x, y, train_ix, valid_ix, _h)
-    classed_0_val, classed_1_val = separate_classes(x, y, valid_ix)
-
-    #print(feat_logs_class1.shape)
-    #print(feat_logs_class0.shape)
-    valid_feats = y[valid_ix]
-    classed_0 = classify(feat_logs_class0, 0, feat_logs_class1, 0, np.where(valid_feats == 0))
-    classed_1 = classify(feat_logs_class0, 0, feat_logs_class1, 0, np.where(valid_feats == 1))
     errors = sum(classed_0) + sum(1 - classed_1)
     error_percent = float(errors) / (len(classed_0) + len(classed_1)) * 100
+
     print(f'errors = {errors:.0f}')
     print(f'Error percent = {error_percent:.2f}')
     return error_percent
@@ -217,6 +135,10 @@ def custom_naive_bayes(_train_data, kf):
             best_val_err = va_err / FOLDS
             best_h = _h
     return best_h
+
+
+def guassian_naive_bayes(_train_data, kf):
+    pass
 
 
 np.set_printoptions(precision=4)
