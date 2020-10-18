@@ -112,6 +112,7 @@ def calc_fold_bayes(x, y, train_ix, valid_ix, _h):
     hit_percentage = get_score(predicted, hit_mask, True) * 100
     errors = get_score(predicted, error_mask)
     error_percentage = get_score(predicted, error_mask, True) * 100
+
     '''
     print("________________________")
     print('Hits: ' + str(hits))
@@ -153,7 +154,17 @@ def custom_naive_bayes(_train_data, kf):
     return best_h
 
 
-def gaussian_naive_bayes(_train_data, kf):
+def gaussian_naive_bayes(_train_data, _test_data):
+    clf = GaussianNB()
+    clf.fit(_train_data[:, 0:4], _train_data[:, 4])
+    return clf.score(_test_data[:, 0:4], _test_data[:, 4])
+
+
+def mcnemars_test():
+    pass
+
+
+def approximate_normal_test():
     pass
 
 
@@ -163,8 +174,7 @@ train_data = np.loadtxt('TP1_train.tsv')
 train_data, test_data = standardize(shuffle(train_data), shuffle(test_data))
 
 folds = StratifiedKFold(n_splits=FOLDS)
-c = logistic_regression(train_data, folds)
-h = custom_naive_bayes(train_data, folds)
+print(logistic_regression(train_data, folds))
+print(custom_naive_bayes(train_data, folds))
+print(gaussian_naive_bayes(train_data, test_data))
 
-print(c)
-print(h)
