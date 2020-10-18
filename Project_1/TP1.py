@@ -1,4 +1,4 @@
-#TODO: Three Classifiers:
+# TODO: Three Classifiers:
 # Logistic Regression
 # find the best value for the regularization parameter C
 # C is in [1e-2, 1e12] each step is *10 (1e-2 ,1e-1 ,1e0,...)
@@ -24,6 +24,7 @@ from sklearn.utils import shuffle
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import KernelDensity
+from sklearn.metrics import accuracy_score
 from sklearn.naive_bayes import GaussianNB
 
 FOLDS = 5
@@ -56,6 +57,10 @@ def separate_classes(x, y, indexes):
     return class0, class1
 
 
+def get_score(predicted, mask, n=False):
+    return accuracy_score(predicted, mask, normalize=n)
+
+
 def classify(features_class0, log_class0, features_class1, log_class1, indexes):
     classes = np.zeros((len(indexes[0]),))
     to_classify_class0 = features_class0[indexes]
@@ -76,7 +81,6 @@ def calc_fold_logistic(x, y, train_ix, valid_ix, _c):
 
 
 def calc_fold_bayes(x, y, train_ix, valid_ix, _h):
-
     kde_1 = KernelDensity(bandwidth=_h)
     kde_0 = KernelDensity(bandwidth=_h)
 
@@ -96,15 +100,27 @@ def calc_fold_bayes(x, y, train_ix, valid_ix, _h):
     class0_log = np.log(class0_valid_test_points.shape[0] / total_len)
     class1_log = np.log(class1_valid_test_points.shape[0] / total_len)
 
-    classed_0 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(valid_point_classes == 0))
-    classed_1 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(valid_point_classes == 1))
+    classed_0 = classify(log_features_class0, class0_log, log_features_class1,
+                         class1_log, np.where(valid_point_classes == 0))
+    classed_1 = classify(log_features_class0, class0_log, log_features_class1,
+                         class1_log, np.where(valid_point_classes == 1))
 
-    errors = sum(classed_0) + sum(1 - classed_1)
-    error_percent = float(errors) / (len(classed_0) + len(classed_1)) * 100
-
-    print(f'errors = {errors:.0f}')
-    print(f'Error percent = {error_percent:.2f}')
-    return error_percent
+    predicted = np.append(classed_0, classed_1)
+    hit_mask = np.append(np.zeros(classed_0.shape), np.ones(classed_1.shape))
+    error_mask = np.append(np.ones(classed_0.shape), np.zeros(classed_1.shape))
+    hits = get_score(predicted, hit_mask)
+    hit_percentage = get_score(predicted, hit_mask, True) * 100
+    errors = get_score(predicted, error_mask)
+    error_percentage = get_score(predicted, error_mask, True) * 100
+    '''
+    print("________________________")
+    print('Hits: ' + str(hits))
+    print('Hit %: ' + str(hit_percentage))
+    print('Errors: ' + str(errors))
+    print('Error %: ' + str(error_percentage))
+    print("________________________")
+    '''
+    return error_percentage
 
 
 def logistic_regression(_train_data, kf):
@@ -137,7 +153,7 @@ def custom_naive_bayes(_train_data, kf):
     return best_h
 
 
-def guassian_naive_bayes(_train_data, kf):
+def gaussian_naive_bayes(_train_data, kf):
     pass
 
 
@@ -146,8 +162,9 @@ test_data = np.loadtxt('TP1_test.tsv')
 train_data = np.loadtxt('TP1_train.tsv')
 train_data, test_data = standardize(shuffle(train_data), shuffle(test_data))
 
-c = logistic_regression(train_data, StratifiedKFold(n_splits=FOLDS))
-h = custom_naive_bayes(train_data, StratifiedKFold(n_splits=FOLDS))
+folds = StratifiedKFold(n_splits=FOLDS)
+c = logistic_regression(train_data, folds)
+h = custom_naive_bayes(train_data, folds)
 
 print(c)
 print(h)
