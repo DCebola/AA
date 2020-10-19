@@ -31,7 +31,6 @@ from math import sqrt
 
 from functools import partial
 from tqdm import tqdm
-
 tqdm = partial(tqdm, position=0, leave=True)
 
 FOLDS = 5
@@ -79,8 +78,8 @@ def logistic_regression(_train_data, _test_data, _c):
            pred
 
 
-def get_score(predicted, mask, n=False):
-    return accuracy_score(predicted, mask, normalize=n)
+def get_score(_predicted, _test_data, n=False):
+    return accuracy_score(_predicted, _test_data, normalize=n)
 
 
 def custom_naive_bayes(_train_data, _test_data, _h):
@@ -100,30 +99,21 @@ def custom_naive_bayes(_train_data, _test_data, _h):
             log_features[:, feat] = calc_distrib(feats_train[:, feat], feats_test[:, feat])
         return log_features
 
-    def classify(features_class0, _log_class0, features_class1, _log_class1, indexes):
-        classes = np.zeros((len(indexes[0]),))
-
-        counter = 0
-        for index in indexes[0]:
+    def classify(features_class0, _log_class0, features_class1, _log_class1, _test_set):
+        classes = np.zeros(_test_set.shape[0],)
+        for i in range(_test_set.shape[0]):
             class0_sum = _log_class0
             class1_sum = _log_class1
             for feat in range(FEATS):
-                class0_sum = class0_sum + features_class0[index, :][feat]
-                class1_sum = class1_sum + features_class1[index, :][feat]
+                class0_sum = class0_sum + features_class0[i, :][feat]
+                class1_sum = class1_sum + features_class1[i, :][feat]
             if class0_sum < class1_sum:
-                classes[counter] = 1
-            counter += 1
+                classes[i] = 1
         return classes
 
     def custom_naive_bayes_score(data_set, log_features_class0, log_features_class1, class0_log, class1_log):
-
-        classed_0 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(data_set[:, FEATS] == 0))
-        classed_1 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(data_set[:, FEATS] == 1))
-
-        predicted = np.append(classed_0, classed_1)
-        error_mask = np.append(np.ones(classed_0.shape), np.zeros(classed_1.shape))
-        #predicted  = classify(log_features_class0, class0_log, log_features_class1, class1_log, data_set.shape[0])
-        return get_score(predicted, error_mask), get_score(predicted, error_mask, True), predicted
+        _predicted = classify(log_features_class0, class0_log, log_features_class1, class1_log, data_set)
+        return data_set.shape[0] - get_score(_predicted, data_set[:, FEATS], False), 1 - get_score(_predicted, data_set[:, FEATS], True), _predicted
 
     class0_train_points, class1_train_points = separate_classes(_train_data[:, 0:FEATS], _train_data[:, FEATS])
 
@@ -181,15 +171,12 @@ def approximate_normal_test(n, err):
 def mc_nemars_test(_test_data, clf_predicted_1, clf_predicted_2):
     e10 = 0
     e01 = 0
-    print(clf_predicted_1)
     for i in range(_test_data.shape[0]):
         if clf_predicted_1[i] != clf_predicted_2[i]:
             if _test_data[:, FEATS][i] == clf_predicted_1[i]:
                 e01 += 1
             else:
                 e10 += 1
-    print(e01)
-    print(e10)
     return ((abs(e01 - e10) - 1) ** 2) / (e01 + e10)
 
 
