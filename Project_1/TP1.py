@@ -37,7 +37,7 @@ MAX_KDE = 60
 FEATS = 4
 
 
-def plot_errs(x, y_train, y_valid, title, x_title,filename):
+def plot_errs(x, y_train, y_valid, title, x_title, filename):
     fig, ax = plt.subplots(figsize=(19, 10))
 
     ax.plot(x, y_train, '-r')
@@ -49,6 +49,7 @@ def plot_errs(x, y_train, y_valid, title, x_title,filename):
     plt.savefig(filename)
     plt.show()
     plt.close(fig)
+
 
 def standardize(_train_data, _test_data):
     _train_features = _train_data[:, 0:4]
@@ -77,25 +78,39 @@ def custom_naive_bayes(_train_data, _test_data, _h):
 
         return class0, class1
 
+    def calc_distrib(x_train, x_test):
+        kde = KernelDensity(bandwidth=_h)
+        x = np.reshape(x_train, (-1, 1))
+        y = np.reshape(x_test, (-1, 1))
+        kde.fit(x)
+        return kde.score_samples(y)
+
     def get_score(predicted, mask, n=False):
         return accuracy_score(predicted, mask, normalize=n)
 
-    def classify(features_class0, log_class0, features_class1, log_class1, indexes):
+    def create_distrib_matrix(feats_train, feats_test):
+        log_features = np.zeros(feats_test.shape)
+        for feat in range(FEATS):
+            log_features[:, feat] = calc_distrib(feats_train[:, feat], feats_test[:, feat])
+        return log_features
+
+    def classify(features_class0, _log_class0, features_class1, _log_class1, indexes):
         classes = np.zeros((len(indexes[0]),))
-        to_classify_class0 = features_class0[indexes]
-        to_classify_class1 = features_class1[indexes]
-        for row in range(to_classify_class0.shape[0]):
-            class0_sum = log_class0 + to_classify_class0[row]
-            class1_sum = log_class1 + to_classify_class1[row]
+
+        counter = 0
+        for index in indexes[0]:
+            class0_sum = _log_class0
+            class1_sum = _log_class1
+            for feat in range(FEATS):
+                class0_sum = class0_sum + features_class0[index, :][feat]
+                class1_sum = class1_sum + features_class1[index, :][feat]
             if class0_sum < class1_sum:
-                classes[row] = 1
+                classes[counter] = 1
+
+            counter += 1
         return classes
 
-    def custom_naive_bayes_score(data_set, log_features_class0, log_features_class1):
-
-        total_len = log_features_class1.shape[0] + log_features_class0.shape[0]
-        class0_log = np.log(class0_valid_test_points.shape[0] / total_len)
-        class1_log = np.log(class1_valid_test_points.shape[0] / total_len)
+    def custom_naive_bayes_score(data_set, log_features_class0, log_features_class1, class0_log, class1_log):
 
         classed_0 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(data_set[:, FEATS] == 0))
         classed_1 = classify(log_features_class0, class0_log, log_features_class1, class1_log, np.where(data_set[:, FEATS] == 1))
@@ -106,32 +121,26 @@ def custom_naive_bayes(_train_data, _test_data, _h):
         hits = get_score(predicted, hit_mask)
         hit_percentage = get_score(predicted, hit_mask, True) * 100
         errors = get_score(predicted, error_mask)
-        error_percentage = get_score(predicted, error_mask, True) * 100
+        error_percentage = get_score(predicted, error_mask, True)
+
         return error_percentage
-    '''
-    print("________________________")
-    print('Hits: ' + str(hits))
-    print('Hit %: ' + str(hit_percentage))
-    print('Errors: ' + str(errors))
-    print('Error %: ' + str(error_percentage))
-    print("________________________")
-    '''
-    kde_1 = KernelDensity(bandwidth=_h)
-    kde_0 = KernelDensity(bandwidth=_h)
 
     class0_train_points, class1_train_points = separate_classes(_train_data[:, 0:FEATS], _train_data[:, FEATS])
-    class0_valid_test_points, class1_valid_test_points = separate_classes(_test_data[:, 0:FEATS], _test_data[:, FEATS])
 
-    kde_0.fit(class0_train_points)
-    kde_1.fit(class1_train_points)
-    train_log_features_class0 = kde_0.score_samples(_train_data[:, 0: FEATS])
-    train_log_features_class1 = kde_1.score_samples(_train_data[:, 0: FEATS])
-    test_log_features_class0 = kde_0.score_samples(_test_data[:, 0: FEATS])
-    test_log_features_class1 = kde_1.score_samples(_test_data[:, 0: FEATS])
+    train_log_features_class0 = create_distrib_matrix(class0_train_points, _train_data[:, 0:FEATS])
 
+    train_log_features_class1 = create_distrib_matrix(class1_train_points, _train_data[:, 0:FEATS])
+
+    test_log_features_class0 = create_distrib_matrix(class0_train_points, _test_data[:, 0:FEATS])
+
+    test_log_features_class1 = create_distrib_matrix(class1_train_points, _test_data[:, 0:FEATS])
+
+    total = _train_data.shape[0]
+    log_class0 = np.log(float(class0_train_points.shape[0]) / total)
+    log_class1 = np.log(float(class1_train_points.shape[0]) / total)
     return\
-        custom_naive_bayes_score(_train_data, train_log_features_class0, train_log_features_class1),\
-        custom_naive_bayes_score(_test_data, test_log_features_class0, test_log_features_class1)
+        custom_naive_bayes_score(_train_data, train_log_features_class0, train_log_features_class1, log_class0, log_class1),\
+        custom_naive_bayes_score(_test_data, test_log_features_class0, test_log_features_class1, log_class0, log_class1)
 
 
 def cross_validation(_train_data, p_values, clf_function, kf):
