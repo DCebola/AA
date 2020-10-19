@@ -28,6 +28,11 @@ from sklearn.neighbors import KernelDensity
 from sklearn.metrics import accuracy_score
 from sklearn.naive_bayes import GaussianNB
 
+from functools import partial
+from tqdm import tqdm
+
+tqdm = partial(tqdm, position=0, leave=True, )
+
 FOLDS = 5
 MAX_C_EXPONENT = 12
 MIN_C_EXPONENT = -2
@@ -80,10 +85,8 @@ def custom_naive_bayes(_train_data, _test_data, _h):
 
     def calc_distrib(x_train, x_test):
         kde = KernelDensity(bandwidth=_h)
-        x = np.reshape(x_train, (-1, 1))
-        y = np.reshape(x_test, (-1, 1))
-        kde.fit(x)
-        return kde.score_samples(y)
+        kde.fit(np.reshape(x_train, (-1, 1)))
+        return kde.score_samples(np.reshape(x_test, (-1, 1)))
 
     def get_score(predicted, mask, n=False):
         return accuracy_score(predicted, mask, normalize=n)
@@ -106,7 +109,6 @@ def custom_naive_bayes(_train_data, _test_data, _h):
                 class1_sum = class1_sum + features_class1[index, :][feat]
             if class0_sum < class1_sum:
                 classes[counter] = 1
-
             counter += 1
         return classes
 
@@ -149,7 +151,7 @@ def cross_validation(_train_data, p_values, clf_function, kf):
     tr_errs = np.zeros((len(p_values),))
     va_errs = np.zeros((len(p_values),))
     counter = 0
-    for p in p_values:
+    for p in tqdm(p_values, ncols=100, desc=clf_function.__name__):
         va_err = 0
         tr_err = 0
         for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
@@ -196,6 +198,6 @@ plot_errs(np.log10(c_values), c_tr_errs, c_va_errs, 'Logistic Regression', ' c v
 plot_errs(h_values, h_tr_errs, h_va_errs, 'KDE based Naive Bayes', 'h value: bandwidth', "NB.png")
 
 
-print(c)
-print(h)
-print(gaussian_naive_bayes(train_data, test_data))
+print("C found: " + str(c))
+print("H found: " + str(h))
+gaussian_naive_bayes(train_data, test_data)
