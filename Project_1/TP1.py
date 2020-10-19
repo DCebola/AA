@@ -72,9 +72,11 @@ def standardize(_train_data, _test_data):
 def logistic_regression(_train_data, _test_data, _c):
     reg = LogisticRegression(C=_c, tol=1e-10)
     reg.fit(_train_data[:, 0:FEATS], _train_data[:, FEATS])
-    squares_train = (reg.predict_proba(_train_data[:, :FEATS])[:, 1] - _train_data[:, FEATS]) ** 2
-    squares_test = (reg.predict_proba(_test_data[:, :FEATS])[:, 1] - _test_data[:, FEATS]) ** 2
-    return np.mean(squares_train), get_score(reg.predict(_test_data[:, 0:FEATS]), _test_data[:, FEATS], True), np.mean(squares_test)
+    pred = reg.predict(_test_data[:, 0:FEATS])
+    return 1 - reg.score(_train_data[:, 0:FEATS], _train_data[:, FEATS]), \
+           1 - reg.score(_test_data[:, 0:FEATS], _test_data[:, FEATS]), \
+           _test_data.shape[0] - get_score(pred, _test_data[:, FEATS], False), \
+           pred
 
 
 def get_score(predicted, mask, n=False):
@@ -120,7 +122,8 @@ def custom_naive_bayes(_train_data, _test_data, _h):
 
         predicted = np.append(classed_0, classed_1)
         error_mask = np.append(np.ones(classed_0.shape), np.zeros(classed_1.shape))
-        return get_score(predicted, error_mask), get_score(predicted, error_mask, True)
+        #predicted  = classify(log_features_class0, class0_log, log_features_class1, class1_log, data_set.shape[0])
+        return get_score(predicted, error_mask), get_score(predicted, error_mask, True), predicted
 
     class0_train_points, class1_train_points = separate_classes(_train_data[:, 0:FEATS], _train_data[:, FEATS])
 
@@ -134,11 +137,11 @@ def custom_naive_bayes(_train_data, _test_data, _h):
     log_class0 = np.log(float(class0_train_points.shape[0]) / total)
     log_class1 = np.log(float(class1_train_points.shape[0]) / total)
     train_errors, train_error_percentage = \
-        custom_naive_bayes_score(_train_data, train_log_features_class0, train_log_features_class1, log_class0, log_class1)
+        custom_naive_bayes_score(_train_data, train_log_features_class0, train_log_features_class1, log_class0, log_class1)[0:2]
 
-    test_errors, test_error_percentage = \
+    test_errors, test_error_percentage, predicted = \
         custom_naive_bayes_score(_test_data, test_log_features_class0, test_log_features_class1, log_class0, log_class1)
-    return train_error_percentage, test_errors, test_error_percentage
+    return train_error_percentage, test_error_percentage, test_errors, predicted
 
 
 def cross_validation(_train_data, p_values, clf_function, kf):
@@ -151,9 +154,7 @@ def cross_validation(_train_data, p_values, clf_function, kf):
         va_err = 0
         tr_err = 0
         for tr_ix, va_ix in kf.split(_train_data[:, 4], _train_data[:, 4]):
-            result = clf_function(_train_data[tr_ix], _train_data[va_ix], p)
-            fold_train_err = result[0]
-            fold_va_err = result[2]
+            fold_train_err, fold_va_err = clf_function(_train_data[tr_ix], _train_data[va_ix], p)[0:2]
             va_err += fold_va_err
             tr_err += fold_train_err
         tr_errs[counter] = tr_err / FOLDS
@@ -168,22 +169,28 @@ def cross_validation(_train_data, p_values, clf_function, kf):
 def gaussian_naive_bayes(_train_data, _test_data):
     clf = GaussianNB()
     clf.fit(_train_data[:, 0:4], _train_data[:, 4])
-    return _test_data.shape[0] - get_score(clf.predict(_test_data[:, 0:4]), _test_data[:, 4], False), \
-           1 - get_score(clf.predict(_test_data[:, 0:4]), _test_data[:, 4], True)
+    predicted = clf.predict(_test_data[:, 0:4])
+    return _test_data.shape[0] - get_score(predicted, _test_data[:, 4], False), predicted
 
 
-def approximate_normal_test(_train_data, _test_data, clf_function, p=any):
-    n = _test_data.shape[0]
-    if p != any:
-        err, err_prob = clf_function(_train_data, _test_data, p)[1:]
-    else:
-        err, err_prob = clf_function(_train_data, _test_data)
+def approximate_normal_test(n, err):
     theta = sqrt(err * (1 - err / n))
-    return n * err_prob, 1.96 * theta
+    return err, 1.96 * theta
 
 
-def mc_nemars_test():
-    pass
+def mc_nemars_test(_test_data, clf_predicted_1, clf_predicted_2):
+    e10 = 0
+    e01 = 0
+    print(clf_predicted_1)
+    for i in range(_test_data.shape[0]):
+        if clf_predicted_1[i] != clf_predicted_2[i]:
+            if _test_data[:, FEATS][i] == clf_predicted_1[i]:
+                e01 += 1
+            else:
+                e10 += 1
+    print(e01)
+    print(e10)
+    return ((abs(e01 - e10) - 1) ** 2) / (e01 + e10)
 
 
 np.set_printoptions(precision=4)
@@ -200,13 +207,27 @@ h, h_tr_errs, h_va_errs = cross_validation(train_data, h_values, custom_naive_ba
 plot_errs(np.log10(c_values), c_tr_errs, c_va_errs, 'Logistic Regression', ' c value as 10 to the power of', "LR.png")
 plot_errs(h_values, h_tr_errs, h_va_errs, 'KDE based Naive Bayes', 'h value: bandwidth', "NB.png")
 
-print("--------------CrossValidation--------------")
-print("C found: " + str(c))
-print("H found: " + str(h))
-print("-------Approximate Normal Test (95%)-------")
-print("Logistic Regression: {0[0]:0.2f} ± {0[1]:0.2f}".format(approximate_normal_test(train_data, test_data, logistic_regression, c)))
-print("Custom gaussian naive bayes: {0[0]:0.2f} ± {0[1]:0.2f}".format(approximate_normal_test(train_data, test_data, custom_naive_bayes, h)))
-print("Gaussian naive bayes: {0[0]:0.2f} ± {0[1]:0.2f}".format(approximate_normal_test(train_data, test_data, gaussian_naive_bayes)))
-print("-------------------------------------------")
-print("--------------McNemar's Test---------------")
-print("-------------------------------------------")
+sample_size = train_data.shape[0]
+l_err, l_pred = logistic_regression(train_data, test_data, c)[2:4]
+c_naive_bayes_err, c_naive_bayes_pred = custom_naive_bayes(train_data, test_data, h)[2:4]
+naive_bayes_err, naive_bayes_pred = gaussian_naive_bayes(train_data, test_data)
+
+print("----------------------\033[1mCrossValidation\033[0m----------------------")
+print("C found: \033[1m" + str(c) + '\033[0m')
+print("H found: \033[1m" + str(h) + '\033[0m')
+print("--------------------------\033[1mScores\033[0m---------------------------")
+print("Logistic Regression errors: \033[1m{err:.2f}\033[0m".format(err=l_err))
+print("Custom gaussian naive bayes errors: \033[1m{err:.2f}\033[0m".format(err=c_naive_bayes_err))
+print("Gaussian naive bayes errors: \033[1m{err:.2f}\033[0m".format(err=naive_bayes_err))
+print("----------------\033[1mApproximate Normal Test (95%)\033[0m--------------")
+print("Logistic Regression: \033[1m{0[0]:0.2f} ± {0[1]:0.2f}\033[0m".format(approximate_normal_test(sample_size, l_err)))
+print("Custom gaussian naive bayes: \033[1m{0[0]:0.2f} ± {0[1]:0.2f}\033[0m".format(approximate_normal_test(sample_size, c_naive_bayes_err)))
+print("Gaussian naive bayes: \033[1m{0[0]:0.2f} ± {0[1]:0.2f}\033[0m".format(approximate_normal_test(sample_size, naive_bayes_err)))
+print("----------------------\033[1mMcNemar's Test\033[0m-----------------------")
+print("Logistic Regression vs Custom gaussian naive bayes: \033[1m{score:.2f}\033[0m". \
+      format(score=mc_nemars_test(test_data, l_pred, c_naive_bayes_pred)))
+print("Logistic Regression vs Gaussian naive bayes: \033[1m{score:.2f}\033[0m". \
+      format(score=mc_nemars_test(test_data, l_pred, naive_bayes_pred)))
+print("Custom gaussian naive bayes vs Gaussian naive bayes: \033[1m{score:.2f}\033[0m". \
+      format(score=mc_nemars_test(test_data, c_naive_bayes_pred, naive_bayes_pred)))
+print("-----------------------------------------------------------")
