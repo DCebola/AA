@@ -79,7 +79,7 @@ def logistic_regression(_train_data, _test_data, _c):
 
 
 def get_score(_predicted, _test_data, n=False):
-    return accuracy_score(_predicted, _test_data, normalize=n)
+    return accuracy_score(_test_data, _predicted, normalize=n)
 
 
 def custom_naive_bayes(_train_data, _test_data, _h):
