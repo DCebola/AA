@@ -105,8 +105,8 @@ def custom_naive_bayes(_train_data, _test_data, _h):
             class0_sum = _log_class0
             class1_sum = _log_class1
             for feat in range(FEATS):
-                class0_sum = class0_sum + features_class0[i, :][feat]
-                class1_sum = class1_sum + features_class1[i, :][feat]
+                class0_sum += features_class0[i, :][feat]
+                class1_sum += features_class1[i, :][feat]
             if class0_sum < class1_sum:
                 classes[i] = 1
         return classes
@@ -116,6 +116,9 @@ def custom_naive_bayes(_train_data, _test_data, _h):
         return data_set.shape[0] - get_score(_predicted, data_set[:, FEATS], False), 1 - get_score(_predicted, data_set[:, FEATS], True), _predicted
 
     class0_train_points, class1_train_points = separate_classes(_train_data[:, 0:FEATS], _train_data[:, FEATS])
+    total = _train_data.shape[0]
+    log_class0 = np.log(float(class0_train_points.shape[0]) / total)
+    log_class1 = np.log(float(class1_train_points.shape[0]) / total)
 
     train_log_features_class0 = create_distrib_matrix(class0_train_points, _train_data[:, 0:FEATS])
     train_log_features_class1 = create_distrib_matrix(class1_train_points, _train_data[:, 0:FEATS])
@@ -123,9 +126,6 @@ def custom_naive_bayes(_train_data, _test_data, _h):
     test_log_features_class0 = create_distrib_matrix(class0_train_points, _test_data[:, 0:FEATS])
     test_log_features_class1 = create_distrib_matrix(class1_train_points, _test_data[:, 0:FEATS])
 
-    total = _train_data.shape[0]
-    log_class0 = np.log(float(class0_train_points.shape[0]) / total)
-    log_class1 = np.log(float(class1_train_points.shape[0]) / total)
     train_errors, train_error_percentage = \
         custom_naive_bayes_score(_train_data, train_log_features_class0, train_log_features_class1, log_class0, log_class1)[0:2]
 
@@ -200,8 +200,8 @@ c_naive_bayes_err, c_naive_bayes_pred = custom_naive_bayes(train_data, test_data
 naive_bayes_err, naive_bayes_pred = gaussian_naive_bayes(train_data, test_data)
 
 print("----------------------\033[1mCrossValidation\033[0m----------------------")
-print("C found: \033[1m" + str(c) + '\033[0m')
-print("H found: \033[1m" + str(h) + '\033[0m')
+print("Best C: \033[1m" + str(c) + '\033[0m')
+print("Best bandwidth: \033[1m" + str(h) + '\033[0m')
 print("--------------------------\033[1mScores\033[0m---------------------------")
 print("Logistic Regression errors: \033[1m{err:.2f}\033[0m".format(err=l_err))
 print("Custom gaussian naive bayes errors: \033[1m{err:.2f}\033[0m".format(err=c_naive_bayes_err))

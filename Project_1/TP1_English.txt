@@ -6,37 +6,37 @@ Attention:
 QUESTIONS:
 
 Q1: Considering the data provided, explain the need to standardize the attribute values.
-R1:
-
+R1: The classification tasks are performed over multivariate data. Due to the magnitude of the values being very different for each of the features (for example, in line23 of the train data,
+the variance is -0.235 and the skewness is -14.740), there is the need to standardize the data to ensure that all features are interpreted with equal weight.
 
 Q2: Explain how you calculated the parameters for standardization and how you used them in the test set.
-R2:
+R2: While preprocessing the data the mean and standard deviation of the whole training data is calculated, then both the training and test data are standardise using these parameters.
+The distribution of each feature will be translated considering the mean and scaled considering the standard deviation, so that the final value of the mean is 0 and of the standard deviation is 1.
 
-
-Q3: Explain how you calculated the prior probability of an example belonging to a class (the probability before taking into account the attribute values ​​of the example) in your Naïve Bayes classifier implementation. You may include a relevant piece of your code if this helps you explain.
-R3:
-
+Q3: Explain how you calculated the prior probability of an example belonging to a class (the probability before taking into account the attribute values of the example) in your Naïve Bayes classifier implementation. You may include a relevant piece of your code if this helps you explain.
+R3: To calculate the prior probability of an example belonging to a class we divide the total number of examples belonging to a a given class by the total number of examples.
 
 Q4: Explain how your Naïve Bayes classifier predicts the class to which a test example belongs. You may include a relevant piece of your code if this helps you explain.
-R4:
-
+R4: To classify a given example, we calculate, for each class, the logarithm of the prior probability and sum it to the sum of the estimated probability for each feature. After the calculations,
+the class for which the sum is the biggest is determined to be the example's class. This can be seen implemented in the private classify function of the custom naive bayes.
 
 Q5: Explain the effect of the bandwidth parameter on your classifier.
-R5:
-
+R5: The bandwidth parameter affects how the kernel function calculates the estimated probability distribution for each feature - the higher the bandwidth, the lower the weight that close feature
+values will have on the feature's distribution. The higher the bandwidth the less strict the classifier's estimate will be. High bandwidth can lead to underfitting whereas low bandwidth can lead
+to overfitting.
 
 Q6: Explain what effect the C parameter has on the Logistic Regression classifier.
-R6:
-
+R6: The Logistic Regression used a L2 type regularization so the C parameter corresponds to 1/λ. As C is inversely proportional to λ, high values of C tend to overfit the classifier whereas low values
+of C tend to undefit the classifier
 
 Q7: Explain how you determined the best bandwidth and C parameters for your classifier and the Logistic Regression classifier. You may include a relevant piece of your code if this helps you explain.
-R7:
-
+R7: An iteration over different values was performed for each of the parameters. In each iteration 5-fold cross validation was used to calculate the validation error. After all the iterations were finished
+the value that was picked for each parameter was the one where the respective average validation error was the lowest.
 
 Q8: Explain how you obtained the best hypothesis for each classifier after optimizing all parameters.
-R8:
-
+R8: Each classifier, using the respective optimized parameter, was fitted with all the training data. Using the features from the test data, the final hypothesis were obtained for all the classifiers.
 
 Q9: Show the best parameters, the estimate of the true error for each hypothesis you obtained (your classifier and the two provided by the library), the ranges in the expected number of errors given by the approximate normal test, the McNemar test values, and discuss what you can conclude from this.
 R9:
+
 
