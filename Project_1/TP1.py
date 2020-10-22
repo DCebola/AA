@@ -1,24 +1,3 @@
-# TODO: Three Classifiers:
-# Logistic Regression
-# find the best value for the regularization parameter C
-# C is in [1e-2, 1e12] each step is *10 (1e-2 ,1e-1 ,1e0,...)
-# plot of cross-validation and training errors for the C parameter
-# ---------------------------
-# Custom Naive Bayes classifier using Kernel Density Estimation
-# Kernel Density Estimation for the probability distributions of the feature values
-# Use the KernelDensity class from sklearn.neighbors.kde for the density estimation
-# KDE is in [0.02,0.6] each step is +0.02
-# Accuracy is measured by accuracy_score (sklearn.metrics.accuracy_score)
-# find the optimum value for the bandwitdh parameter of the kernel density estimators
-# plot of training and cross-validation errors for the KDE kernel
-# ---------------------------
-# Gaussian Naive Bayes classifier in the sklearn.naive_bayes.GaussianNB class
-# ---------------------------
-# Cross Validation each classifier with 5 folds
-# Compare all classifiers, identify the best one and discuss if it is significantly better than the others
-# For comparing the classifiers, use the approximate normal test and McNemar's test, both with a 95% confidence interval
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
@@ -57,10 +36,10 @@ def plot_errs(x, y_train, y_valid, title, x_title, filename):
 
 
 def standardize(_train_data, _test_data):
-    _train_features = _train_data[:, 0:4]
-    _train_classes = _train_data[:, 4]
-    _test_features = _test_data[:, 0:4]
-    _test_classes = _test_data[:, 4]
+    _train_features = _train_data[:, 0:FEATS]
+    _train_classes = _train_data[:, FEATS]
+    _test_features = _test_data[:, 0:FEATS]
+    _test_classes = _test_data[:, FEATS]
     f_means = np.mean(_train_features)
     f_std = np.std(_train_features)
     _train_features = (_train_features - f_means) / f_std
@@ -105,8 +84,8 @@ def custom_naive_bayes(_train_data, _test_data, _h):
             class0_sum = _log_class0
             class1_sum = _log_class1
             for feat in range(FEATS):
-                class0_sum += features_class0[i, :][feat]
-                class1_sum += features_class1[i, :][feat]
+                class0_sum += features_class0[i][feat]
+                class1_sum += features_class1[i][feat]
             if class0_sum < class1_sum:
                 classes[i] = 1
         return classes
@@ -115,20 +94,25 @@ def custom_naive_bayes(_train_data, _test_data, _h):
         _predicted = classify(log_features_class0, class0_log, log_features_class1, class1_log, data_set)
         return data_set.shape[0] - get_score(_predicted, data_set[:, FEATS], False), 1 - get_score(_predicted, data_set[:, FEATS], True), _predicted
 
-    class0_train_points, class1_train_points = separate_classes(_train_data[:, 0:FEATS], _train_data[:, FEATS])
+    # Separate the features of the examples from class 0 and 1 for fitting the kde, and prior probability calculation
+    class0_train_features, class1_train_features = separate_classes(_train_data[:, 0:FEATS], _train_data[:, FEATS])
+
+    # Calculation of the prior probability of an example belonging to class 0 or 1
     total = _train_data.shape[0]
-    log_class0 = np.log(float(class0_train_points.shape[0]) / total)
-    log_class1 = np.log(float(class1_train_points.shape[0]) / total)
+    log_class0 = np.log(float(class0_train_features.shape[0]) / total)
+    log_class1 = np.log(float(class1_train_features.shape[0]) / total)
 
-    train_log_features_class0 = create_distrib_matrix(class0_train_points, _train_data[:, 0:FEATS])
-    train_log_features_class1 = create_distrib_matrix(class1_train_points, _train_data[:, 0:FEATS])
+    # Creating the matrixes with the log of the probability distribution for each feature, for each class, for the training and test data sets
+    train_log_features_class0 = create_distrib_matrix(class0_train_features, _train_data[:, 0:FEATS])
+    train_log_features_class1 = create_distrib_matrix(class1_train_features, _train_data[:, 0:FEATS])
+    test_log_features_class0 = create_distrib_matrix(class0_train_features, _test_data[:, 0:FEATS])
+    test_log_features_class1 = create_distrib_matrix(class1_train_features, _test_data[:, 0:FEATS])
 
-    test_log_features_class0 = create_distrib_matrix(class0_train_points, _test_data[:, 0:FEATS])
-    test_log_features_class1 = create_distrib_matrix(class1_train_points, _test_data[:, 0:FEATS])
-
+    # Retrieving the training error
     train_errors, train_error_percentage = \
         custom_naive_bayes_score(_train_data, train_log_features_class0, train_log_features_class1, log_class0, log_class1)[0:2]
 
+    # Retrieving the training error and hypothesis
     test_errors, test_error_percentage, predicted = \
         custom_naive_bayes_score(_test_data, test_log_features_class0, test_log_features_class1, log_class0, log_class1)
     return train_error_percentage, test_error_percentage, test_errors, predicted
@@ -183,17 +167,22 @@ def mc_nemars_test(_test_data, clf_predicted_1, clf_predicted_2):
 np.set_printoptions(precision=4)
 test_data = np.loadtxt('TP1_test.tsv')
 train_data = np.loadtxt('TP1_train.tsv')
+
+# Standardization of the data sets
 train_data, test_data = standardize(shuffle(train_data), shuffle(test_data))
+
+# Cross validation with k folds for finding the best values of C and bandwidth
 folds = StratifiedKFold(n_splits=FOLDS)
 c_values = list(map(lambda x: 10 ** x, range(MIN_C_EXPONENT, MAX_C_EXPONENT + 1)))
 h_values = list(map(lambda x: x / 100, range(MIN_KDE, MAX_KDE, KDE_STEP)))
-
 c, c_tr_errs, c_va_errs = cross_validation(train_data, c_values, logistic_regression, folds)
 h, h_tr_errs, h_va_errs = cross_validation(train_data, h_values, custom_naive_bayes, folds)
 
+# Train and validation error plotting
 plot_errs(np.log10(c_values), c_tr_errs, c_va_errs, 'Logistic Regression', ' c value as 10 to the power of', "LR.png")
 plot_errs(h_values, h_tr_errs, h_va_errs, 'KDE based Naive Bayes', 'h value: bandwidth', "NB.png")
 
+# Final hypothesis retrieval for each classifier (with the best C and bandwidth found)
 sample_size = train_data.shape[0]
 l_err, l_pred = logistic_regression(train_data, test_data, c)[2:4]
 c_naive_bayes_err, c_naive_bayes_pred = custom_naive_bayes(train_data, test_data, h)[2:4]
