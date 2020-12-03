@@ -29,7 +29,7 @@ R4:
 Q5: Describe your analysis of the k (for K-Means) and epsilon (for DBSCAN) parameters using the internal and external indicators referred in the assignment page. Include the two plots of the indicator values ​​(indicating the image name of each plot in one line in your answer) as a function of the k and epsilon parameters and explain how you chose the ranges for examining these parameters. Indicate, with justification, what conclusions you can draw from this analysis.
 R5:
 
-Q6: Select some of the parameter values ​​tested in question five and examine the corresponding clusters more closely, generating the HTML file with the images. Explain how you selected these parameter values, discuss the different options and propose a recommendation that could help the biologists' task of classifying cells and rejecting segmentation errors.
+Q6: Select some of the parameter values tested in question five and examine the corresponding clusters more closely, generating the HTML file with the images. Explain how you selected these parameter values, discuss the different options and propose a recommendation that could help the biologists' task of classifying cells and rejecting segmentation errors.
 R6:
 
 Q7: Discuss advantages or problems with these two algorithms (K-Means and DBSCAN) for the purpose of helping biologists to organize these images, considering your theoretical knowledge of these algorithms as well as the results you obtained in your work.
