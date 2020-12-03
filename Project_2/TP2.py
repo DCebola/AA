@@ -16,10 +16,17 @@ iso = Isomap(n_components=6)
 img_mat = utils.images_as_matrix()
 # Extract features
 print("Extracting features...")
+feats_map_keys = ["PCA-1", "PCA-2", "PCA-3", "PCA-4", "PCA-5", "PCA-6",
+                  "TSNE-1", "TSNE-2", "TSNE-3", "TSNE-4", "TSNE-5", "TSNE-6",
+                  "ISO-1", "ISO-2", "ISO-3", "ISO-4", "ISO-5", "ISO-6"]
+feats = np.column_stack([pca.fit_transform(img_mat), tsne.fit_transform(img_mat), iso.fit_transform(img_mat)])
+count = 0
 feats_map = {}
-feats = [pca.fit_transform(img_mat), tsne.fit_transform(img_mat), iso.fit_transform(img_mat)]
-for co
+for key in feats_map_keys:
+    feats_map[key] = feats[:, count]
+    count += 1
 print("Features extracted.")
+print(feats_map["PCA-1"].shape)
 # Create clusters
 
 
