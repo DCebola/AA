@@ -5,7 +5,7 @@ from sklearn.manifold import TSNE, Isomap
 from sklearn.feature_selection import f_classif
 from sklearn.cluster import KMeans, DBSCAN
 import matplotlib.pyplot as plt
-from pandas.plotting import radviz, scatter_matrix
+from pandas.plotting import radviz, scatter_matrix, parallel_coordinates
 import seaborn as sns
 
 import numpy as np
@@ -34,14 +34,21 @@ from os import path
 """
 
 
-def plot_heatmap(data):
+def plot_heatmap(data, name):
     plt.figure(figsize=(20, 15))
-    corr = data.iloc[:, :-1].corr()
-    mask = np.zeros_like(corr)
+    _corr = data.corr()
+    mask = np.zeros_like(_corr)
     mask[np.triu_indices_from(mask)] = True
     with sns.axes_style("white"):
-        sns.heatmap(corr, annot=True, mask=mask, square=True, cmap=plt.get_cmap("RdYlGn_r"))
-    plt.savefig('heatmap.png', dpi=200, bbox_inches='tight')
+        sns.heatmap(_corr, vmax=1, vmin=-1, annot=True, mask=mask, square=True, cmap=plt.get_cmap("RdYlGn_r"))
+
+    plt.savefig(name + '.png', dpi=200, bbox_inches='tight')
+    plt.close()
+
+
+def plot_parallel_coordinates(_data):
+    parallel_coordinates(_data, 'class')
+    plt.savefig('parallel.png', dpi=200, bbox_inches='tight')
     plt.close()
 
 
@@ -63,23 +70,22 @@ def selectKBest(_data, _filter, _k=18):
 
 
 def selectLowestCorr(correlation_matrix, max_correlation=0.5):
-    low_corr_feats = []
-    high_corr_feats = []
-    for i in range(correlation_matrix.shape[0]):
-        for j in range(correlation_matrix.shape[1]):
-            if j == 0:
-                low_corr_feats.append(i)
-            elif i >= j:
-                break
-            elif i in high_corr_feats:
-                continue
-            else:
-                c_value = correlation_matrix.iloc[i, j]
-                if c_value < max_correlation:
-                    low_corr_feats.append(j)
+    to_keep = [i for i in range(correlation_matrix.shape[1])]
+    to_remove = []
+    for i in range(correlation_matrix.shape[1]):
+        if i in to_remove:
+            continue
+        else:
+            for j in range(i + 1, correlation_matrix.shape[0]):
+                if j in to_remove:
+                    continue
                 else:
-                    high_corr_feats.append(j)
-    print(low_corr_feats)
+                    c_value = correlation_matrix.iloc[i, j]
+                    if c_value > max_correlation:
+                        if j in to_keep:
+                            to_keep.remove(j)
+                            to_remove.append(j)
+    return to_keep, to_remove
 
 
 np.set_printoptions(precision=4, suppress=True)
@@ -101,14 +107,13 @@ else:
     pickle.dump(feats, open("feats.p", "wb"))
 print("Features extracted")
 
-plot_data = feats
+plot_data = normalize(feats)
 columns = [f'{num}' for num in range(plot_data.shape[1])]
 columns.append("class")
 dataframe = pd.DataFrame(np.column_stack([plot_data, labels[:, -1]]), columns=columns)
-corr = dataframe.iloc[:, :-1].corr()
-selectLowestCorr(corr)
-# selectLowestCorr(dataframe.iloc[:, :-1].corr())
-plot_heatmap(dataframe)
+low_corr, high_corr = selectLowestCorr(dataframe.iloc[:, :-1].corr())
+plot_heatmap(dataframe.iloc[:, :-1], "full_heatmap")
+plot_heatmap(dataframe.iloc[:, low_corr], "low_corr_heatmap")
 
 # Create clusters
 # kmeans_clusters = KMeans()
