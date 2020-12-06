@@ -1,5 +1,6 @@
 import tp2_aux as utils
 
+from scipy.signal import find_peaks_cwt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, Isomap
 from sklearn.feature_selection import f_classif
@@ -52,6 +53,15 @@ def plot_parallel_coordinates(_data):
     plt.close()
 
 
+def plot_5dist(_data, _min):
+    _x = np.linspace(0, len(_data), len(_data))
+    plt.plot(_x, _data, '-b')
+    plt.scatter(_min, _data[_min], marker="x", color=['r'], alpha=1, s=100)
+    plt.show()
+    plt.close()
+    pass
+
+
 def standardize(_data):
     return (_data - np.mean(_data)) / np.std(_data)
 
@@ -88,6 +98,19 @@ def selectLowestCorr(correlation_matrix, max_correlation=0.5):
     return to_keep, to_remove
 
 
+def cluster_eval(_clusters):
+    pass
+
+
+def generate_KMeans_clusters(_data, n_clusters):
+    for n in range(n_clusters+1):
+        cluster_eval(KMeans(n_clusters=n).fit_predict(_data))
+
+
+def generate_DBSCAN_clusters(_data, max_eps, step):
+    pass
+
+
 np.set_printoptions(precision=4, suppress=True)
 tqdm = partial(tqdm, position=0, leave=True)
 
@@ -107,17 +130,22 @@ else:
     pickle.dump(feats, open("feats.p", "wb"))
 print("Features extracted")
 
-plot_data = normalize(feats)
-columns = [f'{num}' for num in range(plot_data.shape[1])]
-columns.append("class")
-dataframe = pd.DataFrame(np.column_stack([plot_data, labels[:, -1]]), columns=columns)
-low_corr, high_corr = selectLowestCorr(dataframe.iloc[:, :-1].corr())
-plot_heatmap(dataframe.iloc[:, :-1], "full_heatmap")
-plot_heatmap(dataframe.iloc[:, low_corr], "low_corr_heatmap")
+plot_data = feats
+#columns = [f'{num}' for num in range(plot_data.shape[1])]
+#columns.append("class")
+#dataframe = pd.DataFrame(np.column_stack([plot_data, labels[:, -1]]), columns=columns)
+#low_corr, high_corr = selectLowestCorr(dataframe.iloc[:, :-1].corr())
+#plot_heatmap(dataframe.iloc[:, :-1], "full_heatmap")
+#plot_heatmap(dataframe.iloc[:, low_corr], "low_corr_heatmap")
 
+_5dists = np.sort(np.linalg.norm(plot_data-plot_data[:, None], axis=-1), axis=-1)[::-1][:, 4]
+_5dists = np.sort(_5dists)[::-1]
+plot_5dist(_5dists, find_peaks_cwt(_5dists*(-1), np.arange(1, 4))[0])
+first_valley = find_peaks_cwt(_5dists*(-1), np.arange(1, 4))[0]
+print(_5dists[first_valley])
 # Create clusters
-# kmeans_clusters = KMeans()
-# dbscan_clusters = DBSCAN()
+#kmeans_clusters = KMeans(n_clusters=10)
+#dbscan_clusters = DBSCAN()
 
 # Plot clusters to features
 
