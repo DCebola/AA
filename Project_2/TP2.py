@@ -5,6 +5,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, Isomap
 from sklearn.feature_selection import f_classif
 from sklearn.cluster import KMeans, DBSCAN
+from sklearn.neighbors import KNeighborsClassifier
 import matplotlib.pyplot as plt
 from pandas.plotting import radviz, scatter_matrix, parallel_coordinates
 import seaborn as sns
@@ -53,10 +54,10 @@ def plot_parallel_coordinates(_data):
     plt.close()
 
 
-def plot_5dist(_data, _min):
+def plot_5dist(_data, _valleys):
     _x = np.linspace(0, len(_data), len(_data))
     plt.plot(_x, _data, '-b')
-    plt.scatter(_min, _data[_min], marker="x", color=['r'], alpha=1, s=100)
+    plt.scatter(_valleys, _data[_valleys], marker="x", color=['r'], alpha=1, s=50)
     plt.show()
     plt.close()
     pass
@@ -99,6 +100,7 @@ def selectLowestCorr(correlation_matrix, max_correlation=0.5):
 
 
 def cluster_eval(_clusters):
+
     pass
 
 
@@ -107,8 +109,9 @@ def generate_KMeans_clusters(_data, n_clusters):
         cluster_eval(KMeans(n_clusters=n).fit_predict(_data))
 
 
-def generate_DBSCAN_clusters(_data, max_eps, step):
-    pass
+def generate_DBSCAN_clusters(_data, _valleys_dists):
+    for v in _valleys_dists:
+        cluster_eval(DBSCAN(eps=v).fit_predict(_data))
 
 
 np.set_printoptions(precision=4, suppress=True)
@@ -138,14 +141,17 @@ plot_data = feats
 #plot_heatmap(dataframe.iloc[:, :-1], "full_heatmap")
 #plot_heatmap(dataframe.iloc[:, low_corr], "low_corr_heatmap")
 
+#kn = KNeighborsClassifier()
+#kn.fit(plot_data, np.zeros(plot_data.shape[0]))
+#kneighbors = np.sort(np.array(kn.kneighbors()[0]).flatten())[::-1]
+
+
 _5dists = np.sort(np.linalg.norm(plot_data-plot_data[:, None], axis=-1), axis=-1)[::-1][:, 4]
 _5dists = np.sort(_5dists)[::-1]
-plot_5dist(_5dists, find_peaks_cwt(_5dists*(-1), np.arange(1, 4))[0])
-first_valley = find_peaks_cwt(_5dists*(-1), np.arange(1, 4))[0]
-print(_5dists[first_valley])
-# Create clusters
-#kmeans_clusters = KMeans(n_clusters=10)
-#dbscan_clusters = DBSCAN()
+
+valleys = find_peaks_cwt(_5dists*(-1), np.arange(1, 4))
+valleys_dists = _5dists[valleys]
+plot_5dist(_5dists, valleys)
 
 # Plot clusters to features
 
