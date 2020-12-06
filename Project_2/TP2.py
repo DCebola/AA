@@ -1,5 +1,6 @@
 import tp2_aux as utils
 
+from sklearn.metrics import adjusted_rand_score, precision_score, recall_score, f1_score, silhouette_score
 from scipy.signal import find_peaks_cwt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, Isomap
@@ -54,11 +55,11 @@ def plot_parallel_coordinates(_data):
     plt.close()
 
 
-def plot_5dist(_data, _valleys):
+def plot_5dist(_data, _valleys, name):
     _x = np.linspace(0, len(_data), len(_data))
     plt.plot(_x, _data, '-b')
     plt.scatter(_valleys, _data[_valleys], marker="x", color=['r'], alpha=1, s=50)
-    plt.show()
+    plt.savefig(name)
     plt.close()
     pass
 
@@ -99,13 +100,42 @@ def selectLowestCorr(correlation_matrix, max_correlation=0.5):
     return to_keep, to_remove
 
 
-def cluster_eval(_clusters):
-
-    pass
-
+def cluster_eval(_feats, _predicted_labels, _true_labels):
+    #adjusted_rand_score, precision_score, recall_score, f1_score, silhouette_score
+    labeled_feats = _feats[LABELED]
+    tp = 0
+    tn = 0
+    fn = 0
+    fp = 0
+    for i in range(labeled_feats.shape[0]):
+        for j in range(i+1, labeled_feats.shape[0]):
+            if i == j:
+                continue
+            else:
+                if _predicted_labels[LABELED][i] == _predicted_labels[LABELED][j]:
+                    if _true_labels[i] == _true_labels[j]:
+                        tp += 1
+                    else:
+                        fp += 1
+                elif _true_labels[i] == _true_labels[j]:
+                    fn += 1
+                else:
+                    tn += 1
+    n_pairs = (labeled_feats.shape[0] * (labeled_feats.shape[0]-1))/2
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    rand_index = (tp + tn) / n_pairs
+    f1 = 2 * (precision*recall)/(precision+recall)
+    scores = {"silhouette_score": silhouette_score(_feats, _predicted_labels)
+            , "precision_score": precision
+            , "recall_score": recall
+            , "f1_score": f1
+            , "adjusted_rand_score": adjusted_rand_score(_true_labels, _predicted_labels[LABELED])
+            , "rand_index": rand_index}
+    return scores
 
 def generate_KMeans_clusters(_data, n_clusters):
-    for n in range(n_clusters+1):
+    for n in range(n_clusters + 1):
         cluster_eval(KMeans(n_clusters=n).fit_predict(_data))
 
 
@@ -133,25 +163,32 @@ else:
     pickle.dump(feats, open("feats.p", "wb"))
 print("Features extracted")
 
+#plot_data = selectKBest(feats, f_test(feats[LABELED], labels[LABELED][:,-1]), 18)
 plot_data = feats
-#columns = [f'{num}' for num in range(plot_data.shape[1])]
-#columns.append("class")
-#dataframe = pd.DataFrame(np.column_stack([plot_data, labels[:, -1]]), columns=columns)
-#low_corr, high_corr = selectLowestCorr(dataframe.iloc[:, :-1].corr())
-#plot_heatmap(dataframe.iloc[:, :-1], "full_heatmap")
-#plot_heatmap(dataframe.iloc[:, low_corr], "low_corr_heatmap")
 
-#kn = KNeighborsClassifier()
-#kn.fit(plot_data, np.zeros(plot_data.shape[0]))
-#kneighbors = np.sort(np.array(kn.kneighbors()[0]).flatten())[::-1]
+columns = [f'{num}' for num in range(plot_data.shape[1])]
+columns.append("class")
+dataframe = pd.DataFrame(np.column_stack([plot_data, labels[:, -1]]), columns=columns)
+low_corr, high_corr = selectLowestCorr(dataframe.iloc[:, :-1].corr())
+plot_heatmap(dataframe.iloc[:, :-1], "full_heatmap")
+plot_heatmap(dataframe.iloc[:, low_corr], "low_corr_heatmap")
 
+# kn = KNeighborsClassifier()
+# kn.fit(plot_data, np.zeros(plot_data.shape[0]))
+# kneighbors = np.sort(np.array(kn.kneighbors()[0]).flatten())[::-1]
 
-_5dists = np.sort(np.linalg.norm(plot_data-plot_data[:, None], axis=-1), axis=-1)[::-1][:, 4]
+plot_data = plot_data[:,high_corr]
+_5dists = np.sort(np.linalg.norm(plot_data - plot_data[:, None], axis=-1), axis=-1)[::-1][:, 4]
 _5dists = np.sort(_5dists)[::-1]
 
-valleys = find_peaks_cwt(_5dists*(-1), np.arange(1, 4))
+valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 4))
 valleys_dists = _5dists[valleys]
-plot_5dist(_5dists, valleys)
+plot_5dist(_5dists, valleys[0], "5-dists")
+
+kmeans = KMeans(n_clusters=3)
+final_labels = kmeans.fit_predict(plot_data)
+
+print(cluster_eval(plot_data, final_labels, labels[LABELED][:, -1]))
 
 # Plot clusters to features
 
