@@ -21,12 +21,9 @@ import seaborn as sns
 
 
 def plot_joint_plot(_data, name, title):
-    print(_data)
     plt.figure(figsize=(20, 15))
     plt.title(title)
-    sns.jointplot(data=_data, x=str(_data.columns[0]), y=str(_data.columns[1]),
-                  hue="class")
-    sns.jointplot(data=_data, x=_data.columns[0], y=_data.columns[1], hue="class", kind="kde")
+    sns.jointplot(data=_data, x=_data.columns[0], y=_data.columns[1], hue="class", kind="kde", palette=PALETTE[:_data["class"].unique().size])
     plt.savefig('plots/' + name + '.png', dpi=200, bbox_inches='tight')
     plt.close()
 
@@ -34,8 +31,10 @@ def plot_joint_plot(_data, name, title):
 def plot_paired_density_and_scatter_plot(_data, name, title):
     plt.figure(figsize=(20, 15))
     plt.title(title)
-    g = sns.pairplot(_data, hue="class", markers=["o", "s", "D"])
-    g.map_lower(sns.kdeplot, hue="class")
+    g = sns.PairGrid(_data, hue="class", palette=PALETTE[:_data["class"].unique().size])
+    g.map_upper(sns.scatterplot)
+    g.map_lower(sns.kdeplot)
+    g.map_diag(sns.kdeplot)
     plt.savefig('plots/' + name + '.png', dpi=200, bbox_inches='tight')
     plt.close()
 
@@ -46,8 +45,7 @@ def plot_heatmap(_data, name, title):
     _corr = _data.corr()
     mask = np.zeros_like(_corr)
     mask[np.triu_indices_from(mask)] = True
-    with sns.axes_style("white"):
-        sns.heatmap(_corr, vmax=1, vmin=-1, annot=True, mask=mask, square=True, cmap=plt.get_cmap("RdYlGn_r"))
+    sns.heatmap(_corr, vmax=1, vmin=-1, annot=True, mask=mask, square=True, cmap=plt.get_cmap("RdYlGn_r"))
 
     plt.savefig('plots/' + name + '.png', dpi=200, bbox_inches='tight')
     plt.close()
@@ -68,8 +66,8 @@ def plot_5dist(_data, _valleys, name, title):
 def plot_metrics(_data, name, parameter, title):
     plt.figure(figsize=(20, 15))
     plt.title(title)
-    sns.lineplot(data=_data, x="x", y="y", hue="metric")
-    sns.scatterplot(data=_data, x="x", y="y", hue="metric", legend=False)
+    sns.lineplot(data=_data, x="x", y="y", hue="metric", palette=PALETTE[:_data["metric"].unique().size])
+    sns.scatterplot(data=_data, x="x", y="y", hue="metric", legend=False, palette=PALETTE[:_data["metric"].unique().size])
     plt.xlabel(parameter)
     plt.ylabel("Score")
     plt.savefig('plots/' + name + '.png', dpi=200, bbox_inches='tight')
@@ -149,12 +147,12 @@ def cluster_eval(_feats, _predicted_labels, _true_labels, _x):
            "rand_index": rand_index})
     """
     return [
-        ('silhouette_score', _silhouette_score, _x),
-        ('precision_score', precision, _x),
-        ('recall_score', recall, _x),
-        ('f1_score', f1, _x),
-        ('adjusted_rand_score', _adjusted_rand_score, _x),
-        ('rand_index', rand_index, _x)
+        ('silhouette_score', _x, _silhouette_score),
+        ('precision_score', _x, precision),
+        ('recall_score', _x, recall),
+        ('f1_score', _x, f1),
+        ('adjusted_rand_score', _x, _adjusted_rand_score),
+        ('rand_index', _x, rand_index)
     ]
 
 
@@ -162,10 +160,9 @@ def generate_KMeans_clusters(_data, n_clusters, _true_labels):
     _results = []
     for n in range(2, n_clusters + 1):
         _clusters = KMeans(n_clusters=n).fit_predict(_data)
-        _plt_data = _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 2)]
-        plot_joint_plot(pd.concat([_plt_data, pd.Series(_clusters, name='class')], axis=1),
-                        "/kmeans_" + str(n) + "clusters",
-                        "Kmeans w/ " + str(n) + " clusters")
+        _plt_data = _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)]
+        plot_paired_density_and_scatter_plot(pd.concat([_plt_data.iloc[:, :6], pd.Series(_clusters, name='class')], axis=1),
+                                             "kmeans/clusters_paired_densities_" + str(n), "Kmeans w/ " + str(n) + " clusters")
         for m in cluster_eval(_data, _clusters, _true_labels, n):
             _results.append(m)
     return _results
@@ -173,17 +170,22 @@ def generate_KMeans_clusters(_data, n_clusters, _true_labels):
 
 def generate_DBSCAN_clusters(_data, _valleys_dists, _true_labels):
     _results = []
+    i = 0
     for v in _valleys_dists:
+        i += 1
         _clusters = DBSCAN(eps=v).fit_predict(_data)
-        _plt_data = _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 2)]
-        plot_joint_plot(pd.concat([_plt_data, pd.Series(_clusters, name='class')], axis=1),
-                        "/dbscan_" + str(v) + "clusters", "DBSCAN w/ ε = " + str(v))
+        _plt_data = _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)]
+        plot_paired_density_and_scatter_plot(pd.concat([_plt_data.iloc[:, :6], pd.Series(_clusters, name='class')], axis=1),
+                                             "dbscan/clusters_paired_densities_" + str(i), "DBSCAN w/ ε = " + str(v))
         for m in cluster_eval(_data, _clusters, _true_labels, v):
             _results.append(m)
     return _results
 
 
 np.set_printoptions(precision=4, suppress=True)
+sns.set_style("ticks")
+PALETTE = sns.color_palette("muted", 12)
+
 labels = np.loadtxt("labels.txt", delimiter=",")
 LABELED = np.where(labels[:, -1] != 0)
 
@@ -199,8 +201,9 @@ else:
     feats = np.column_stack([pca.fit_transform(img_mat), tsne.fit_transform(img_mat), iso.fit_transform(img_mat)])
     pickle.dump(feats, open("feats.p", "wb"))
 
-DATA_COLS = [f'{num}' for num in range(feats.shape[1])].append("class")
-METRICS_COLS = ["metric", "y", "x"]
+DATA_COLS = [f'f_{num}' for num in range(feats.shape[1])]
+DATA_COLS.append("class")
+METRICS_COLS = ["metric", "x", "y"]
 data_df = pd.DataFrame(np.column_stack([feats, labels[:, -1]]), columns=DATA_COLS)
 print("Features extracted")
 
@@ -220,8 +223,8 @@ plot_heatmap(data_df.iloc[:, LOW_CORR], "low_corr_heatmap", "Low Correlated Feat
 # -----------------------------------------------------------------Cluster Generation-----------------------------------------------------------------
 
 # KMeans
-kmeans_cluster_results_df = pd.DataFrame(generate_KMeans_clusters(data_df.iloc[:, :-1], 10, labels[LABELED][:, 1]), columns=METRICS_COLS)
-plot_metrics(kmeans_cluster_results_df, "kmeans_cluster_metrics", "Clusters", "KMeans Cluster Metrics")
+kmeans_cluster_results_df = pd.DataFrame(generate_KMeans_clusters(data_df.iloc[:, :-1], 3, labels[LABELED][:, 1]), columns=METRICS_COLS)
+plot_metrics(kmeans_cluster_results_df, "kmeans/kmeans_cluster_metrics", "Clusters", "KMeans Cluster Metrics")
 
 # DBSCAN
 
@@ -235,11 +238,10 @@ _5dists = np.sort(_5dists)[::-1]
 
 valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 4))
 valleys_dists = _5dists[valleys]
+plot_5dist(_5dists, valleys[0], "dbscan/5-dists", "5 Distances")
 
-dbscan_cluster_results_df = pd.DataFrame(generate_DBSCAN_clusters(data_df.iloc[:, :-1], valleys_dists[:8], labels[LABELED][:, 1]),
+dbscan_cluster_results_df = pd.DataFrame(generate_DBSCAN_clusters(data_df.iloc[:, :-1], valleys_dists[:2], labels[LABELED][:, 1]),
                                          columns=METRICS_COLS)
-
-plot_5dist(_5dists, valleys[0], "5-dists", "5 Distances")
-plot_metrics(dbscan_cluster_results_df, "dbscan_cluster_metrics", "ε", "DBSCAN Cluster Metrics")
+plot_metrics(dbscan_cluster_results_df, "dbscan/dbscan_cluster_metrics", "ε", "DBSCAN Cluster Metrics")
 
 # Bisecting K-Means
