@@ -185,7 +185,7 @@ def generate_DBSCAN_clusters(_data, _valleys_dists, _true_labels):
 np.set_printoptions(precision=4, suppress=True)
 sns.set_style("ticks")
 PALETTE = sns.color_palette("muted", 12)
-
+NUM_ITER = 5
 labels = np.loadtxt("labels.txt", delimiter=",")
 LABELED = np.where(labels[:, -1] != 0)
 
@@ -204,7 +204,7 @@ else:
 DATA_COLS = [f'f_{num}' for num in range(feats.shape[1])]
 DATA_COLS.append("class")
 METRICS_COLS = ["metric", "x", "y"]
-data_df = pd.DataFrame(np.column_stack([feats, labels[:, -1]]), columns=DATA_COLS)
+data_df = pd.DataFrame(normalize(np.column_stack([feats, labels[:, -1]])), columns=DATA_COLS)
 print("Features extracted")
 
 # -----------------------------------------------------------------Feature selection------------------------------------------------------------------
@@ -223,7 +223,7 @@ plot_heatmap(data_df.iloc[:, LOW_CORR], "low_corr_heatmap", "Low Correlated Feat
 # -----------------------------------------------------------------Cluster Generation-----------------------------------------------------------------
 
 # KMeans
-kmeans_cluster_results_df = pd.DataFrame(generate_KMeans_clusters(data_df.iloc[:, :-1], 3, labels[LABELED][:, 1]), columns=METRICS_COLS)
+kmeans_cluster_results_df = pd.DataFrame(generate_KMeans_clusters(data_df.iloc[:, :-1], NUM_ITER + 1, labels[LABELED][:, 1]), columns=METRICS_COLS)
 plot_metrics(kmeans_cluster_results_df, "kmeans/kmeans_cluster_metrics", "Clusters", "KMeans Cluster Metrics")
 
 # DBSCAN
@@ -240,7 +240,7 @@ valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 4))
 valleys_dists = _5dists[valleys]
 plot_5dist(_5dists, valleys[0], "dbscan/5-dists", "5 Distances")
 
-dbscan_cluster_results_df = pd.DataFrame(generate_DBSCAN_clusters(data_df.iloc[:, :-1], valleys_dists[:2], labels[LABELED][:, 1]),
+dbscan_cluster_results_df = pd.DataFrame(generate_DBSCAN_clusters(data_df.iloc[:, :-1], valleys_dists[:NUM_ITER], labels[LABELED][:, 1]),
                                          columns=METRICS_COLS)
 plot_metrics(dbscan_cluster_results_df, "dbscan/dbscan_cluster_metrics", "ε", "DBSCAN Cluster Metrics")
 
