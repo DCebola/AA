@@ -3,17 +3,24 @@ import numpy as np
 import pandas as pd
 import pickle
 import os.path as path
+from math import sqrt
+from functools import reduce
 
 # Sklearn
 from sklearn.metrics import adjusted_rand_score, silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, Isomap
 from sklearn.feature_selection import f_classif
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.feature_extraction.image import grid_to_graph
+from sklearn.cluster import KMeans, DBSCAN, FeatureAgglomeration
 from sklearn.neighbors import KNeighborsClassifier
 
 # SciPy
 from scipy.signal import find_peaks_cwt
+
+# Skimage
+from skimage.io import imsave, imread
+from skimage.transform import resize
 
 # Plots
 import matplotlib.pyplot as plt
@@ -110,15 +117,13 @@ def filter_low_high_corr(correlation_matrix, max_correlation=0.5):
     return to_keep, to_remove
 
 
-def cluster_eval(_feats, _predicted_labels, _true_labels, _x):
-    # adjusted_rand_score, precision_score, recall_score, f1_score, silhouette_score
-    labeled_feats = _feats.iloc[LABELED]
+def calculate_confusion_matrix(_feats, _predicted_labels, _true_labels):
     tp = 0
     tn = 0
     fn = 0
     fp = 0
-    for i in range(labeled_feats.shape[0]):
-        for j in range(i + 1, labeled_feats.shape[0]):
+    for i in range(_feats.shape[0]):
+        for j in range(i + 1, _feats.shape[0]):
             if i == j:
                 continue
             else:
@@ -131,21 +136,22 @@ def cluster_eval(_feats, _predicted_labels, _true_labels, _x):
                     fn += 1
                 else:
                     tn += 1
+    return tp, tn, fn, fp
+
+
+def cluster_eval(_feats, _predicted_labels, _true_labels, _x):
+    labeled_feats = _feats.iloc[LABELED]
+    tp, tn, fn, fp = calculate_confusion_matrix(labeled_feats, _predicted_labels, _true_labels)
     n_pairs = (labeled_feats.shape[0] * (labeled_feats.shape[0] - 1)) / 2
     precision = tp / (tp + fp)
     recall = tp / (tp + fn)
     rand_index = (tp + tn) / n_pairs
     f1 = 2 * (precision * recall) / (precision + recall)
-    _silhouette_score = silhouette_score(_feats.to_numpy(), _predicted_labels)
+    try:
+        _silhouette_score = silhouette_score(_feats.to_numpy(), _predicted_labels)
+    except ValueError:
+        _silhouette_score = -1
     _adjusted_rand_score = adjusted_rand_score(_true_labels, _predicted_labels[LABELED])
-    """
-    print({"silhouette_score": _silhouette_score,
-           "precision_score": precision,
-           "recall_score": recall,
-           "f1_score": f1,
-           "adjusted_rand_score": _adjusted_rand_score,
-           "rand_index": rand_index})
-    """
     return [
         ('silhouette_score', _x, _silhouette_score),
         ('precision_score', _x, precision),
@@ -182,6 +188,33 @@ def generate_DBSCAN_clusters(_data, _valleys_dists, _true_labels):
     return _results
 
 
+def get_factors(value):
+    factors = []
+    for i in range(1, int(value ** 0.5) + 1):
+        if value % i == 0:
+            factors.append((int(value / i), i))
+    factors.reverse()
+    return factors[0]
+
+
+def save_images(_path, _images):
+    i = 0
+    for _image in _images:
+        imsave(_path + str(i) + ".png", resize(np.reshape(_image, get_factors(_image.shape[0])), (50, 50),
+                                               order=0, preserve_range=True, anti_aliasing=False).astype('uint8'))
+        i += 1
+
+
+def agglomerate_images_pixels(_images):
+    print(_images[0].shape)
+    _agglomerated_feats = FeatureAgglomeration(connectivity=grid_to_graph(50, 50), n_clusters=2)
+    _agglomerated_feats.fit(_images)
+    _reduced = _agglomerated_feats.transform(_images)
+    _restored = _agglomerated_feats.inverse_transform(_reduced)
+    save_images("reduced_images/", _reduced)
+    save_images("restored_images/", _restored)
+
+
 np.set_printoptions(precision=4, suppress=True)
 sns.set_style("ticks")
 PALETTE = sns.color_palette("muted", 12)
@@ -198,9 +231,10 @@ else:
     iso = Isomap(n_components=6)
     print("Extracting features...")
     img_mat = utils.images_as_matrix()
+    agglomerate_images_pixels(img_mat)
     feats = np.column_stack([pca.fit_transform(img_mat), tsne.fit_transform(img_mat), iso.fit_transform(img_mat)])
-    pickle.dump(feats, open("feats.p", "wb"))
-
+    # pickle.dump(feats, open("feats.p", "wb"))
+"""
 DATA_COLS = [f'f_{num}' for num in range(feats.shape[1])]
 DATA_COLS.append("class")
 METRICS_COLS = ["metric", "x", "y"]
@@ -245,3 +279,4 @@ dbscan_cluster_results_df = pd.DataFrame(generate_DBSCAN_clusters(data_df.iloc[:
 plot_metrics(dbscan_cluster_results_df, "dbscan/dbscan_cluster_metrics", "ε", "DBSCAN Cluster Metrics")
 
 # Bisecting K-Means
+"""
