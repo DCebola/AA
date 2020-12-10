@@ -1,12 +1,11 @@
 import tp2_aux as utils
 import numpy as np
+import numpy.matlib as npm
 import pandas as pd
 import pickle
-import os.path as path
+from os import path, mkdir
 from math import sqrt
 from functools import reduce
-
-# Sklearn
 from sklearn.metrics import adjusted_rand_score, silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, Isomap
@@ -14,17 +13,20 @@ from sklearn.feature_selection import f_classif
 from sklearn.feature_extraction.image import grid_to_graph
 from sklearn.cluster import KMeans, DBSCAN, FeatureAgglomeration
 from sklearn.neighbors import KNeighborsClassifier
-
-# SciPy
 from scipy.signal import find_peaks_cwt
-
-# Skimage
-from skimage.io import imsave, imread
+from skimage.io import imsave
 from skimage.transform import resize
-
-# Plots
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+PALETTE = sns.color_palette("muted", 12)
+np.set_printoptions(precision=4, suppress=True)
+sns.set_style("ticks")
+
+
+def create_dir(_path):
+    if not path.exists(_path):
+        mkdir(_path)
 
 
 def plot_joint_plot(_data, name, title):
@@ -164,28 +166,41 @@ def cluster_eval(_feats, _predicted_labels, _true_labels, _x):
 
 def generate_KMeans_clusters(_data, n_clusters, _true_labels):
     _results = []
+    _cluster_results = []
     for n in range(2, n_clusters + 1):
         _clusters = KMeans(n_clusters=n).fit_predict(_data)
-        _plt_data = _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)]
-        plot_paired_density_and_scatter_plot(pd.concat([_plt_data.iloc[:, :6], pd.Series(_clusters, name='class')], axis=1),
-                                             "kmeans/clusters_paired_densities_" + str(n), "Kmeans w/ " + str(n) + " clusters")
+        _cluster_results.append((_clusters, _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)], pd.Series(_clusters, name='class')))
         for m in cluster_eval(_data, _clusters, _true_labels, n):
             _results.append(m)
-    return _results
+    return _results, _cluster_results
 
 
 def generate_DBSCAN_clusters(_data, _valleys_dists, _true_labels):
     _results = []
+    _cluster_results = []
     i = 0
     for v in _valleys_dists:
         i += 1
         _clusters = DBSCAN(eps=v).fit_predict(_data)
-        _plt_data = _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)]
-        plot_paired_density_and_scatter_plot(pd.concat([_plt_data.iloc[:, :6], pd.Series(_clusters, name='class')], axis=1),
-                                             "dbscan/clusters_paired_densities_" + str(i), "DBSCAN w/ ε = " + str(v))
+        _cluster_results.append((_clusters, _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)], pd.Series(_clusters, name='class'), v))
         for m in cluster_eval(_data, _clusters, _true_labels, v):
             _results.append(m)
-    return _results
+    return _results, _cluster_results
+
+
+def findElbow(curve):
+    nPoints = curve.shape[0]
+    allCoord = np.vstack((range(curve.shape[0]), curve)).T
+    np.array([range(nPoints), curve])
+    firstPoint = allCoord[0]
+    lineVec = allCoord[-1] - allCoord[0]
+    lineVecNorm = lineVec / np.sqrt(np.sum(lineVec ** 2))
+    vecFromFirst = allCoord - firstPoint
+    scalarProduct = np.sum(vecFromFirst * npm.repmat(lineVecNorm, nPoints, 1), axis=1)
+    vecFromFirstParallel = np.outer(scalarProduct, lineVecNorm)
+    vecToLine = vecFromFirst - vecFromFirstParallel
+    distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
+    return allCoord[np.argmax(distToLine)]
 
 
 def get_factors(value):
@@ -205,78 +220,143 @@ def save_images(_path, _images):
         i += 1
 
 
-def agglomerate_images_pixels(_images):
-    print(_images[0].shape)
-    _agglomerated_feats = FeatureAgglomeration(connectivity=grid_to_graph(50, 50), n_clusters=2)
+def agglomerate_images_pixels(_images, N=18):
+    _agglomerated_feats = FeatureAgglomeration(connectivity=grid_to_graph(50, 50), n_clusters=N)
     _agglomerated_feats.fit(_images)
     _reduced = _agglomerated_feats.transform(_images)
     _restored = _agglomerated_feats.inverse_transform(_reduced)
-    save_images("reduced_images/", _reduced)
-    save_images("restored_images/", _restored)
+    create_dir("reduced_images/" + str(N))
+    create_dir("restored_images/" + str(N))
+    save_images("reduced_images/" + str(N) + "/", _reduced)
+    save_images("restored_images/" + str(N) + "/", _restored)
+    return _reduced, _restored
 
 
-np.set_printoptions(precision=4, suppress=True)
-sns.set_style("ticks")
-PALETTE = sns.color_palette("muted", 12)
-NUM_ITER = 5
+def extract_features(_images):
+    return np.column_stack([PCA(n_components=6).fit_transform(_images),
+                            TSNE(n_components=6, method='exact').fit_transform(_images),
+                            Isomap(n_components=6).fit_transform(_images)])
+
+
+def get_original_feats_data(_images):
+    if path.exists("original_feats.p"):
+        print("Loading features...")
+        _original_feats = pickle.load(open("original_feats.p", "rb"))
+        print("Loaded original features...")
+    else:
+        print("Extracting features...")
+        _original_feats = extract_features(_images)
+        pickle.dump(_original_feats, open("original_feats.p", "wb"))
+        print("Extracted original features...")
+    return _original_feats
+
+
+def get_reduced_feats_data(_images, N=18):
+    if path.exists("reduced_feats.p"):
+        print("Loading features...")
+        _reduced_feats = pickle.load(open("reduced_feats.p", "rb"))
+        print("Loaded reduced features...")
+        _restored_feats = pickle.load(open("restored_feats.p", "rb"))
+        print("Loaded restored features...")
+    else:
+        print("Reducing images...")
+        _reduced_images, _restored_images = agglomerate_images_pixels(_images, N)
+        _reduced_feats = extract_features(_reduced_images)
+        pickle.dump(_reduced_feats, open("reduced_feats.p", "wb"))
+        print("Extracted reduced features...")
+        _restored_feats = extract_features(_restored_images)
+        pickle.dump(_restored_feats, open("restored_feats.p", "wb"))
+        print("Extracted restored features...")
+    return _reduced_feats, _restored_feats
+
+
+def experiment(_path, _feats, _labels, cluster_iter):
+    print(150 * "_")
+    create_dir("plots/" + _path)
+    create_dir("plots/" + _path + "/kmeans")
+    create_dir("plots/" + _path + "/kmeans/clusters")
+    create_dir("plots/" + _path + "/dbscan")
+    create_dir("plots/" + _path + "/dbscan/clusters")
+    DATA_COLS = [f'f_{num}' for num in range(_feats.shape[1])]
+    DATA_COLS.append("class")
+    METRICS_COLS = ["metric", "x", "y"]
+    data_df = pd.DataFrame(normalize(np.column_stack([_feats, _labels[:, -1]])), columns=DATA_COLS)
+
+    # -----------------------------------------------------------------Feature selection--------------------------------------------------------------
+    # Finding low and highly correlated features
+    LOW_CORR, HIGH_CORR = filter_low_high_corr(data_df.iloc[:, :-1].corr())
+    print("Found correlation between features.")
+
+    # Sequential backward elimination
+    # KMeans
+    # DBSCAN
+    # Bisecting K-Means
+
+    # -----------------------------------------------------------------Cluster Generation-------------------------------------------------------------
+
+    # KMeans
+    kmeans_metrics, kmeans_clusters = generate_KMeans_clusters(data_df.iloc[:, :-1], cluster_iter + 1, labels[LABELED][:, 1])
+    kmeans_metrics_df = pd.DataFrame(kmeans_metrics, columns=METRICS_COLS)
+    print("Generated kmeans clusters.")
+
+    # DBSCAN
+    kn = KNeighborsClassifier()
+    kn.fit(_feats, np.zeros(_feats.shape[0]))
+    _5dists = np.sort(np.array(kn.kneighbors()[0]).flatten())[::-1]
+    # _5dists = np.sort(np.linalg.norm(_feats - _feats[:, None], axis=-1), axis=-1)[::-1][:, 4]
+    # _5dists = np.sort(_5dists)[::-1]
+    # valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 5))
+    # valleys_dists = _5dists[valleys]
+    best_eps = findElbow(_5dists)
+    eps_range = []
+    for num in range(cluster_iter):
+        eps_range.append(best_eps[1] - num * 250)
+    dbscan_metrics, dbscan_clusters = generate_DBSCAN_clusters(data_df.iloc[:, :-1], eps_range, labels[LABELED][:, 1])
+    dbscan_metrics_df = pd.DataFrame(dbscan_metrics, columns=METRICS_COLS)
+    print("Generated dbscan clusters.")
+
+    # Bisecting K-Means
+
+    # -----------------------------------------------------------------Plot Results-------------------------------------------------------------------
+
+    # Features correlations
+    plot_heatmap(data_df.iloc[:, :-1], _path + "/full_heatmap", "Features Heatmap")
+    plot_heatmap(data_df.iloc[:, LOW_CORR], _path + "/low_corr_heatmap", "Low Correlated Features Heatmap")
+    print("Plotted features' heatmaps.")
+
+    # Kmeans results
+    plot_metrics(kmeans_metrics_df, _path + "/kmeans/kmeans_cluster_metrics", "Clusters", "KMeans Cluster Metrics")
+    i = 0
+    for _run_data in kmeans_clusters:
+        utils.report_clusters(_labels[:, 0], _run_data[0], "plots/" + _path + "/kmeans/clusters/clusters_" + str(i + 1) + ".html")
+        plot_paired_density_and_scatter_plot(pd.concat([_run_data[1].iloc[:, :6], _run_data[2]], axis=1),
+                                             _path + "/kmeans/clusters_paired_densities_" + str(i), "Kmeans w/ " + str(i) + " clusters")
+        i += 1
+        print("Plotted kmeans cluster - " + str(i))
+
+    # DBSCAN results
+    plot_5dist(_5dists, int(best_eps[0]), _path + "/dbscan/5-dists", "5 Distances")
+    plot_metrics(dbscan_metrics_df, _path + "/dbscan/dbscan_cluster_metrics", "ε", "DBSCAN Cluster Metrics")
+    i = 0
+    for _run_data in dbscan_clusters:
+        utils.report_clusters(_labels[:, 0], _run_data[0], "plots/" + _path + "/dbscan/clusters/clusters_" + str(i + 1) + ".html")
+        plot_paired_density_and_scatter_plot(pd.concat([_run_data[1].iloc[:, :6], _run_data[2]], axis=1),
+                                             _path + "/dbscan/clusters_paired_densities_" + str(i), "DBSCAN w/ ε = " + str(_run_data[3]))
+        i += 1
+        print("Plotted dbscan cluster - " + str(i))
+
+
 labels = np.loadtxt("labels.txt", delimiter=",")
 LABELED = np.where(labels[:, -1] != 0)
+images = utils.images_as_matrix()
+CLUSTER_ITERATIONS = 5
+create_dir("plots")
+create_dir("reduced_images")
+create_dir("restored_images")
 
-if path.exists("feats.p"):
-    f = open("feats.p", "rb")
-    feats = pickle.load(f)
-else:
-    pca = PCA(n_components=6)
-    tsne = TSNE(n_components=6, method='exact')
-    iso = Isomap(n_components=6)
-    print("Extracting features...")
-    img_mat = utils.images_as_matrix()
-    agglomerate_images_pixels(img_mat)
-    feats = np.column_stack([pca.fit_transform(img_mat), tsne.fit_transform(img_mat), iso.fit_transform(img_mat)])
-    # pickle.dump(feats, open("feats.p", "wb"))
-"""
-DATA_COLS = [f'f_{num}' for num in range(feats.shape[1])]
-DATA_COLS.append("class")
-METRICS_COLS = ["metric", "x", "y"]
-data_df = pd.DataFrame(normalize(np.column_stack([feats, labels[:, -1]])), columns=DATA_COLS)
-print("Features extracted")
+original_feats = get_original_feats_data(images)
+experiment("original", original_feats, labels, CLUSTER_ITERATIONS)
 
-# -----------------------------------------------------------------Feature selection------------------------------------------------------------------
-# Finding low and highly correlated features
-LOW_CORR, HIGH_CORR = filter_low_high_corr(data_df.iloc[:, :-1].corr())
-plot_heatmap(data_df.iloc[:, :-1], "full_heatmap", "Features Heatmap")
-plot_heatmap(data_df.iloc[:, LOW_CORR], "low_corr_heatmap", "Low Correlated Features Heatmap")
-# plot_data = selectKBest(feats, f_test(feats[LABELED], labels[LABELED][:,-1]), 18)
-
-# Sequential backward elimination
-
-# KMeans
-# DBSCAN
-# Bisecting K-Means
-
-# -----------------------------------------------------------------Cluster Generation-----------------------------------------------------------------
-
-# KMeans
-kmeans_cluster_results_df = pd.DataFrame(generate_KMeans_clusters(data_df.iloc[:, :-1], NUM_ITER + 1, labels[LABELED][:, 1]), columns=METRICS_COLS)
-plot_metrics(kmeans_cluster_results_df, "kmeans/kmeans_cluster_metrics", "Clusters", "KMeans Cluster Metrics")
-
-# DBSCAN
-
-# kn = KNeighborsClassifier()
-# kn.fit(plot_data, np.zeros(plot_data.shape[0]))
-# kneighbors = np.sort(np.array(kn.kneighbors()[0]).flatten())[::-1]
-
-plot_data = feats[:, HIGH_CORR]
-_5dists = np.sort(np.linalg.norm(plot_data - plot_data[:, None], axis=-1), axis=-1)[::-1][:, 4]
-_5dists = np.sort(_5dists)[::-1]
-
-valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 4))
-valleys_dists = _5dists[valleys]
-plot_5dist(_5dists, valleys[0], "dbscan/5-dists", "5 Distances")
-
-dbscan_cluster_results_df = pd.DataFrame(generate_DBSCAN_clusters(data_df.iloc[:, :-1], valleys_dists[:NUM_ITER], labels[LABELED][:, 1]),
-                                         columns=METRICS_COLS)
-plot_metrics(dbscan_cluster_results_df, "dbscan/dbscan_cluster_metrics", "ε", "DBSCAN Cluster Metrics")
-
-# Bisecting K-Means
-"""
+# reduced_feats, restored_feats = get_reduced_feats_data(images)
+# experiment("reduced", reduced_feats, labels, CLUSTER_ITERATIONS)
+# experiment("restored", restored_feats, labels, CLUSTER_ITERATIONS)
