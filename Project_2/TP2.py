@@ -456,7 +456,6 @@ HEURISTIC_WEIGHTS = [3, 3, 1]
 labels = np.loadtxt("labels.txt", delimiter=",")
 LABELED = np.where(labels[:, -1] != 0)
 images = utils.images_as_matrix()
-kernel
 create_dir("data")
 create_dir("plots")
 create_dir("plots/kmeans")
@@ -467,7 +466,9 @@ original_feats = get_original_feats_data(images)
 experiment("original", original_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
 # experiment("standardized", standardize(original_feats), labels, feature_selection=True, corr_filter=False, cluster_iter=10)
 # experiment("normalized", original_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+"""
 for n in [10, 50, 250]:
     reduced_feats, restored_feats = get_reduced_feats_data(images, n)
     experiment(str(n) + "_reduced", reduced_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
     experiment(str(n) + "_restored", restored_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+"""
