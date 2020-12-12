@@ -72,14 +72,31 @@ def plot_5dist(_data, _valleys, name, title):
     plt.close()
 
 
-def plot_metrics(_data, name, parameter, title):
+def plot_cluster_bar_metrics(_data, name, title):
     plt.figure(figsize=(20, 15))
+    plt.title(title)
+    g = sns.barplot(data=_data, x="metric", y="y", palette=PALETTE[:_data["metric"].unique().size])
+    g.set_xticklabels(g.get_xticklabels(), rotation=30)
+    i = 0
+    for _y in _data.get('y'):
+        g.text(i, round(_y, 4), round(_y, 4), color='black', ha="center", fontsize='x-large')
+        i += 1
+    plt.xlabel("Metrics")
+    plt.ylabel("Score")
+    plt.ylim(0, 1)
+    plt.savefig("plots/" + name + '.png', dpi=200, bbox_inches='tight')
+    plt.close()
+
+
+def plot_cluster_line_metrics(_data, name, parameter, title):
+    plt.subplots(figsize=(20, 15))
     plt.title(title)
     sns.lineplot(data=_data, x="x", y="y", hue="metric", palette=PALETTE[:_data["metric"].unique().size])
     sns.scatterplot(data=_data, x="x", y="y", hue="metric", legend=False, palette=PALETTE[:_data["metric"].unique().size])
     plt.xlabel(parameter)
     plt.ylabel("Score")
-    plt.savefig('plots/' + name + '.png', dpi=200, bbox_inches='tight')
+    plt.ylim(0, 1)
+    plt.savefig("plots/" + name + '.png', dpi=200, bbox_inches='tight')
     plt.close()
 
 
@@ -134,10 +151,11 @@ def calculate_confusion_matrix(_feats, _predicted_labels, _true_labels):
                         tp += 1
                     else:
                         fp += 1
-                elif _true_labels[i] == _true_labels[j]:
-                    fn += 1
                 else:
-                    tn += 1
+                    if _true_labels[i] == _true_labels[j]:
+                        fn += 1
+                    else:
+                        tn += 1
     return tp, tn, fn, fp
 
 
@@ -152,40 +170,38 @@ def cluster_eval(_feats, _predicted_labels, _true_labels, _x):
     try:
         _silhouette_score = silhouette_score(_feats.to_numpy(), _predicted_labels)
     except ValueError:
-        _silhouette_score = -1
+        _silhouette_score = 0
     _adjusted_rand_score = adjusted_rand_score(_true_labels, _predicted_labels[LABELED])
     return [
-        ('silhouette_score', _x, _silhouette_score),
-        ('precision_score', _x, precision),
-        ('recall_score', _x, recall),
-        ('f1_score', _x, f1),
-        ('adjusted_rand_score', _x, _adjusted_rand_score),
-        ('rand_index', _x, rand_index)
+        ('Silhouette Score', _x, _silhouette_score),
+        ('Precision Score', _x, precision),
+        ('Recall', _x, recall),
+        ('F1-Measure', _x, f1),
+        ('Adjusted Random Score', _x, _adjusted_rand_score),
+        ('Random Index', _x, rand_index)
     ]
 
 
 def generate_KMeans_clusters(_data, n_clusters, _true_labels):
-    _results = []
-    _cluster_results = []
+    _metrics = []
+    _clusters = []
     for n in range(2, n_clusters + 1):
         _clusters = KMeans(n_clusters=n).fit_predict(_data)
-        _cluster_results.append((_clusters, _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)], pd.Series(_clusters, name='class')))
         for m in cluster_eval(_data, _clusters, _true_labels, n):
-            _results.append(m)
-    return _results, _cluster_results
+            _metrics.append(m)
+    return _metrics, _clusters
 
 
 def generate_DBSCAN_clusters(_data, _valleys_dists, _true_labels):
-    _results = []
-    _cluster_results = []
+    _metrics = []
+    _clusters = []
     i = 0
     for v in _valleys_dists:
         i += 1
         _clusters = DBSCAN(eps=v).fit_predict(_data)
-        _cluster_results.append((_clusters, _data.iloc[:, filterKBest(_data, f_test(_data, _clusters), 18)], pd.Series(_clusters, name='class'), v))
         for m in cluster_eval(_data, _clusters, _true_labels, v):
-            _results.append(m)
-    return _results, _cluster_results
+            _metrics.append(m)
+    return _metrics, _clusters
 
 
 def findElbow(curve):
@@ -225,10 +241,12 @@ def agglomerate_images_pixels(_images, N=18):
     _agglomerated_feats.fit(_images)
     _reduced = _agglomerated_feats.transform(_images)
     _restored = _agglomerated_feats.inverse_transform(_reduced)
-    create_dir("reduced_images/" + str(N))
-    create_dir("restored_images/" + str(N))
-    save_images("reduced_images/" + str(N) + "/", _reduced)
-    save_images("restored_images/" + str(N) + "/", _restored)
+    create_dir("data/reduced/" + str(N))
+    create_dir("data/restored/" + str(N))
+    create_dir("data/reduced/" + str(N) + "/images")
+    create_dir("data/restored/" + str(N) + "/images")
+    save_images("data/reduced/" + str(N) + "/images/", _reduced)
+    save_images("data/restored/" + str(N) + "/images/", _restored)
     return _reduced, _restored
 
 
@@ -239,124 +257,176 @@ def extract_features(_images):
 
 
 def get_original_feats_data(_images):
-    if path.exists("original_feats.p"):
+    if path.exists("data/original/original_feats.p"):
         print("Loading features...")
-        _original_feats = pickle.load(open("original_feats.p", "rb"))
+        _original_feats = pickle.load(open("data/original/original_feats.p", "rb"))
         print("Loaded original features...")
     else:
         print("Extracting features...")
         _original_feats = extract_features(_images)
-        pickle.dump(_original_feats, open("original_feats.p", "wb"))
+        create_dir("data/original/")
+        pickle.dump(_original_feats, open("data/original/original_feats.p", "wb"))
         print("Extracted original features...")
     return _original_feats
 
 
 def get_reduced_feats_data(_images, N=18):
-    if path.exists("reduced_feats.p"):
+    if path.exists("data/reduced/" + str(N) + "/reduced_feats.p"):
         print("Loading features...")
-        _reduced_feats = pickle.load(open("reduced_feats.p", "rb"))
+        _reduced_feats = pickle.load(open("data/reduced/" + str(N) + "/reduced_feats.p", "rb"))
         print("Loaded reduced features...")
-        _restored_feats = pickle.load(open("restored_feats.p", "rb"))
+        _restored_feats = pickle.load(open("data/restored/" + str(N) + "/restored_feats.p", "rb"))
         print("Loaded restored features...")
     else:
         print("Reducing images...")
         _reduced_images, _restored_images = agglomerate_images_pixels(_images, N)
         _reduced_feats = extract_features(_reduced_images)
-        pickle.dump(_reduced_feats, open("reduced_feats.p", "wb"))
+        pickle.dump(_reduced_feats, open("data/reduced/" + str(N) + "/reduced_feats.p", "wb"))
         print("Extracted reduced features...")
         _restored_feats = extract_features(_restored_images)
-        pickle.dump(_restored_feats, open("restored_feats.p", "wb"))
+        pickle.dump(_restored_feats, open("data/restored/" + str(N) + "/restored_feats.p", "wb"))
         print("Extracted restored features...")
     return _reduced_feats, _restored_feats
 
 
-def experiment(_path, _feats, _labels, cluster_iter):
+def experiment(_name, _feats, _labels, feature_selection=False, cluster_iter=0):
     print(150 * "_")
-    create_dir("plots/" + _path)
-    create_dir("plots/" + _path + "/kmeans")
-    create_dir("plots/" + _path + "/kmeans/clusters")
-    create_dir("plots/" + _path + "/dbscan")
-    create_dir("plots/" + _path + "/dbscan/clusters")
     DATA_COLS = [f'f_{num}' for num in range(_feats.shape[1])]
     DATA_COLS.append("class")
     METRICS_COLS = ["metric", "x", "y"]
-    data_df = pd.DataFrame(normalize(np.column_stack([_feats, _labels[:, -1]])), columns=DATA_COLS)
-
+    data_df = pd.DataFrame(np.column_stack([_feats, _labels[:, -1]]), columns=DATA_COLS)
+    # ________________________________________________________________________________________________________________________________________________
     # -----------------------------------------------------------------Feature selection--------------------------------------------------------------
-    # Finding low and highly correlated features
-    LOW_CORR, HIGH_CORR = filter_low_high_corr(data_df.iloc[:, :-1].corr())
-    print("Found correlation between features.")
-
+    # Finding best eps
+    # kn = KNeighborsClassifier()
+    # kn.fit(_feats, np.zeros(_feats.shape[0]))
+    # _5dists = np.sort(np.array(kn.kneighbors()[0]).flatten())[::-1]
+    _5dists = np.sort(np.linalg.norm(_feats - _feats[:, None], axis=-1), axis=-1)[::-1][:, 4]
+    _5dists = np.sort(_5dists)[::-1]
+    valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 15))
+    valleys_dists = _5dists[valleys]
+    best_eps = valleys_dists[0]
+    FINAL_KMEANS_SELECTED_FEATS = []
+    FINAL_DBSCAN_SELECTED_FEATS = []
     # Sequential backward elimination
-    # KMeans
-    # DBSCAN
-    # Bisecting K-Means
+    if feature_selection:
+        # --------------------------------------------------------------------Kmeans-------------------------------------------------------------------
+        _clusters = KMeans(n_clusters=3).fit_predict(data_df)
+        KMEANS_SELECTED_FEATS = filterKBest(data_df, f_test(data_df.iloc[LABELED],  _labels[LABELED][:, 1]), 18)
+        _metrics = []
+        best_silhouette = -1
+        for n in range(0, 17):
+            selected_feats = data_df.iloc[:, KMEANS_SELECTED_FEATS]
+            _clusters = KMeans(n_clusters=3).fit_predict(selected_feats)
+            m_results = cluster_eval(selected_feats, _clusters, _labels[LABELED][:, 1], 18 - n)
+            silhouette = m_results[0][2]
+            if silhouette >= best_silhouette:
+                best_silhouette = silhouette
+                FINAL_KMEANS_SELECTED_FEATS = KMEANS_SELECTED_FEATS
+            for m in m_results:
+                _metrics.append(m)
+            KMEANS_SELECTED_FEATS = filterKBest(selected_feats, f_test(selected_feats.iloc[LABELED],  _labels[LABELED][:, 1]), 18 - (n + 1))
+        plot_cluster_line_metrics(pd.DataFrame(_metrics, columns=METRICS_COLS), "kmeans/" + _name + "_kmeans_features_metrics", "Features",
+                                  "KMeans Features Metrics")
 
-    # -----------------------------------------------------------------Cluster Generation-------------------------------------------------------------
+        # --------------------------------------------------------------------DBSCAN------------------------------------------------------------------
+        _clusters = DBSCAN(eps=best_eps).fit_predict(data_df)
+        DBSCAN_SELECTED_FEATS = filterKBest(data_df, f_test(data_df, _clusters), 18)
+        _metrics = []
+        best_silhouette = -1
+        for n in range(0, 17):
+            selected_feats = data_df.iloc[:, DBSCAN_SELECTED_FEATS]
+            _clusters = DBSCAN(eps=best_eps).fit_predict(selected_feats)
+            m_results = cluster_eval(selected_feats, _clusters, _labels[LABELED][:, 1], 18 - (n + 1))
+            silhouette = m_results[0][2]
+            if silhouette >= best_silhouette:
+                best_silhouette = silhouette
+                FINAL_DBSCAN_SELECTED_FEATS = DBSCAN_SELECTED_FEATS
+            for m in m_results:
+                _metrics.append(m)
+            DBSCAN_SELECTED_FEATS = filterKBest(selected_feats, f_test(selected_feats, _clusters), 18 - (n + 1))
+        plot_cluster_line_metrics(pd.DataFrame(_metrics, columns=METRICS_COLS), "dbscan/" + _name + "_dbscan_features_metrics", "Features",
+                                  "DBSCAN Features Metrics")
 
-    # KMeans
-    kmeans_metrics, kmeans_clusters = generate_KMeans_clusters(data_df.iloc[:, :-1], cluster_iter + 1, labels[LABELED][:, 1])
-    kmeans_metrics_df = pd.DataFrame(kmeans_metrics, columns=METRICS_COLS)
-    print("Generated kmeans clusters.")
+    print("Features Selected: " + str(FINAL_KMEANS_SELECTED_FEATS) + ", " + str(FINAL_DBSCAN_SELECTED_FEATS))
 
-    # DBSCAN
-    kn = KNeighborsClassifier()
-    kn.fit(_feats, np.zeros(_feats.shape[0]))
-    _5dists = np.sort(np.array(kn.kneighbors()[0]).flatten())[::-1]
-    # _5dists = np.sort(np.linalg.norm(_feats - _feats[:, None], axis=-1), axis=-1)[::-1][:, 4]
-    # _5dists = np.sort(_5dists)[::-1]
-    # valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 5))
-    # valleys_dists = _5dists[valleys]
-    best_eps = findElbow(_5dists)
-    eps_range = []
-    for num in range(cluster_iter):
-        eps_range.append(best_eps[1] - num * 250)
-    dbscan_metrics, dbscan_clusters = generate_DBSCAN_clusters(data_df.iloc[:, :-1], eps_range, labels[LABELED][:, 1])
-    dbscan_metrics_df = pd.DataFrame(dbscan_metrics, columns=METRICS_COLS)
-    print("Generated dbscan clusters.")
-
-    # Bisecting K-Means
-
-    # -----------------------------------------------------------------Plot Results-------------------------------------------------------------------
+    # Finding low and highly correlated features
+    # LOW_CORR, HIGH_CORR = filter_low_high_corr(data_df.iloc[:, :-1].corr())
 
     # Features correlations
-    plot_heatmap(data_df.iloc[:, :-1], _path + "/full_heatmap", "Features Heatmap")
-    plot_heatmap(data_df.iloc[:, LOW_CORR], _path + "/low_corr_heatmap", "Low Correlated Features Heatmap")
-    print("Plotted features' heatmaps.")
+    plot_heatmap(data_df.iloc[:, :-1], _name + "_full_heatmap", "Features Heatmap")
+    if feature_selection:
+        plot_heatmap(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS], _name + "_kmeans_feats_heatmap", "Features Heatmap")
+        plot_heatmap(data_df.iloc[:, FINAL_DBSCAN_SELECTED_FEATS], _name + "_dbscan_feats_heatmap", "Features Heatmap")
+        _kmeans_clusters = KMeans(n_clusters=3).fit_predict(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS])
+        _dbscan_clusters = DBSCAN(eps=best_eps).fit_predict(data_df.iloc[:, FINAL_DBSCAN_SELECTED_FEATS])
 
-    # Kmeans results
-    plot_metrics(kmeans_metrics_df, _path + "/kmeans/kmeans_cluster_metrics", "Clusters", "KMeans Cluster Metrics")
-    i = 0
-    for _run_data in kmeans_clusters:
-        utils.report_clusters(_labels[:, 0], _run_data[0], "plots/" + _path + "/kmeans/clusters/clusters_" + str(i + 1) + ".html")
-        plot_paired_density_and_scatter_plot(pd.concat([_run_data[1].iloc[:, :6], _run_data[2]], axis=1),
-                                             _path + "/kmeans/clusters_paired_densities_" + str(i), "Kmeans w/ " + str(i) + " clusters")
-        i += 1
-        print("Plotted kmeans cluster - " + str(i))
+        kmeans_best_2_dims = filterKBest(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS],
+                                         f_test(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS], _kmeans_clusters), 2)
+        dbscan_best_2_dims = filterKBest(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS],
+                                         f_test(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS], _dbscan_clusters), 2)
+        print(kmeans_best_2_dims)
 
-    # DBSCAN results
-    plot_5dist(_5dists, int(best_eps[0]), _path + "/dbscan/5-dists", "5 Distances")
-    plot_metrics(dbscan_metrics_df, _path + "/dbscan/dbscan_cluster_metrics", "ε", "DBSCAN Cluster Metrics")
-    i = 0
-    for _run_data in dbscan_clusters:
-        utils.report_clusters(_labels[:, 0], _run_data[0], "plots/" + _path + "/dbscan/clusters/clusters_" + str(i + 1) + ".html")
-        plot_paired_density_and_scatter_plot(pd.concat([_run_data[1].iloc[:, :6], _run_data[2]], axis=1),
-                                             _path + "/dbscan/clusters_paired_densities_" + str(i), "DBSCAN w/ ε = " + str(_run_data[3]))
-        i += 1
-        print("Plotted dbscan cluster - " + str(i))
+        _kmeans_plt_data = pd.concat(
+            [data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS].iloc[:, kmeans_best_2_dims], pd.Series(_kmeans_clusters, name='class')],
+            axis=1)
+        _dbscan_plt_data = pd.concat(
+            [data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS].iloc[:, dbscan_best_2_dims], pd.Series(_dbscan_clusters, name='class')],
+            axis=1)
+    else:
+        _kmeans_clusters = KMeans(n_clusters=3).fit_predict(data_df)
+        _dbscan_clusters = DBSCAN(eps=best_eps).fit_predict(data_df)
+        kmeans_best_2_dims = filterKBest(data_df, f_test(data_df, _kmeans_clusters), 2)
+        dbscan_best_2_dims = filterKBest(data_df, f_test(data_df, _dbscan_clusters), 2)
+        _kmeans_plt_data = pd.concat([data_df.iloc[:, kmeans_best_2_dims], pd.Series(_kmeans_clusters, name='class')], axis=1)
+        _dbscan_plt_data = pd.concat([data_df.iloc[:, dbscan_best_2_dims], pd.Series(_dbscan_clusters, name='class')], axis=1)
+
+    plot_joint_plot(_kmeans_plt_data, "kmeans/" + _name + "_clusters", "Kmeans")
+    utils.report_clusters(_labels[:, 0], _kmeans_clusters, "clusters/" + _name + "_kmeans_clusters.html")
+    plot_5dist(_5dists, valleys[0], "dbscan/" + _name + "_5-dists", "5 Distances")
+    plot_joint_plot(_dbscan_plt_data, "dbscan/" + _name + "_clusters", "DBSCAN")
+    utils.report_clusters(_labels[:, 0], _dbscan_clusters, "clusters/" + _name + "_dbscan_clusters.html")
+
+    """
+    # ________________________________________________________________________________________________________________________________________________
+    # -----------------------------------------------------------------Cluster Comparing--------------------------------------------------------------
+    if cluster_iter > 0:
+        # KMeans
+        kmeans_metrics_df = pd.DataFrame(generate_KMeans_clusters(data_df.iloc[:, LOW_CORR], cluster_iter, labels[LABELED][:, 1])[0],
+                                         columns=METRICS_COLS)
+        # DBSCAN
+        eps_range = []
+        for num in np.arange(0, best_eps[1], best_eps[1] / cluster_iter):
+            eps_range.append(best_eps[1] - num)
+        eps_range.reverse()
+        dbscan_metrics_df = pd.DataFrame(generate_DBSCAN_clusters(data_df.iloc[:, LOW_CORR], eps_range, labels[LABELED][:, 1])[0],
+                                         columns=METRICS_COLS)
+        # Bisecting K-Means
+        # Other
+        plot_cluster_line_metrics(kmeans_metrics_df, "/kmeans/" + _name + "_kmeans_parameter_metrics", "Clusters", "KMeans Cluster Metrics")
+        plot_cluster_line_metrics(dbscan_metrics_df, "/dbscan/" + _name + "_dbscan_parameter_metrics", "ε", "DBSCAN Cluster Metrics")
+    # ________________________________________________________________________________________________________________________________________________
+"""
 
 
 labels = np.loadtxt("labels.txt", delimiter=",")
 LABELED = np.where(labels[:, -1] != 0)
 images = utils.images_as_matrix()
-CLUSTER_ITERATIONS = 5
+create_dir("data")
 create_dir("plots")
-create_dir("reduced_images")
-create_dir("restored_images")
+create_dir("plots/kmeans")
+create_dir("plots/dbscan")
+create_dir("clusters")
 
 original_feats = get_original_feats_data(images)
-experiment("original", original_feats, labels, CLUSTER_ITERATIONS)
+experiment("F_original", original_feats, labels, cluster_iter=10, feature_selection=True)
+# experiment("F_standardized", standardize(original_feats), labels, cluster_iter=10, feature_selection=True)
+# experiment("F_normalized", normalize(original_feats), labels, cluster_iter=10, feature_selection=True)
+# experiment("original", original_feats, labels, cluster_iter=10, feature_selection=False)
+# experiment("standardized", standardize(original_feats), labels, cluster_iter=10, feature_selection=False)
+# experiment("normalized", normalize(original_feats), labels, cluster_iter=10, feature_selection=False)
 
-# reduced_feats, restored_feats = get_reduced_feats_data(images)
-# experiment("reduced", reduced_feats, labels, CLUSTER_ITERATIONS)
-# experiment("restored", restored_feats, labels, CLUSTER_ITERATIONS)
+"""
+for n in [10, 50, 250]:
+    reduced_feats, restored_feats = get_reduced_feats_data(images, n)
+"""
