@@ -289,6 +289,46 @@ def get_reduced_feats_data(_images, N=18):
     return _reduced_feats, _restored_feats
 
 
+def sequential_backward_elimination(_data, _true_labels, _classifier, _heuristic, _total_feats=18):
+    _clusters = _classifier.fit_predict(_data)
+    CURRENT_SELECTED_FEATS = filterKBest(_data, f_test(_data.iloc[LABELED], _true_labels), _total_feats)
+    FINAL_SELECTED_FEATS = []
+    _metrics = []
+    best = -1
+    for _n in range(0, _total_feats - 1):
+        _selected_feats = _data.iloc[:, CURRENT_SELECTED_FEATS]
+        _clusters = _classifier.fit_predict(_selected_feats)
+        _m_results = cluster_eval(_selected_feats, _clusters, _true_labels, _total_feats - _n)
+        found = _heuristic(_m_results)
+        if found >= best:
+            best = found
+            FINAL_SELECTED_FEATS = CURRENT_SELECTED_FEATS
+        for _m in _m_results:
+            _metrics.append(_m)
+        _m_results = filterKBest(_selected_feats, f_test(_selected_feats.iloc[LABELED], _true_labels), _total_feats - (_n + 1))
+    return FINAL_SELECTED_FEATS, _metrics
+
+
+class MyReinforcedClassifier:
+    def __init__(self, classifier, N=3):
+        self.classifiers = []
+        for i in range(0, N):
+            self.classifiers.append(classifier)
+
+    def fit_predict(self, _data, _true_labels):
+        pass
+
+
+class MyHeuristic:
+    def __init__(self, evaluation_parameters, weights):
+        self.evaluation_parameters = evaluation_parameters
+        self.weights = weights
+
+    def fit_predict(self, evaluation_score):
+        final_score = 0
+        pass
+
+
 def experiment(_name, _feats, _labels, feature_selection=False, cluster_iter=0):
     print(150 * "_")
     DATA_COLS = [f'f_{num}' for num in range(_feats.shape[1])]
@@ -306,13 +346,21 @@ def experiment(_name, _feats, _labels, feature_selection=False, cluster_iter=0):
     valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 15))
     valleys_dists = _5dists[valleys]
     best_eps = valleys_dists[0]
-    FINAL_KMEANS_SELECTED_FEATS = []
-    FINAL_DBSCAN_SELECTED_FEATS = []
+    KMEANS_SELECTED = []
+    DBSCAN_SELECTED = []
+    heuristic = MyHeuristic([], [])
     # Sequential backward elimination
     if feature_selection:
         # --------------------------------------------------------------------Kmeans-------------------------------------------------------------------
+        KMEANS_SELECTED, kmeans_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1], KMeans(n_clusters=3), heuristic)
+        DBSCAN_SELECTED, dbscan_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1], DBSCAN(eps=best_eps), heuristic)
+        plot_cluster_line_metrics(pd.DataFrame(kmeans_metrics, columns=METRICS_COLS), "kmeans/" + _name + "_kmeans_features_metrics", "Features",
+                                  "KMeans Features Metrics")
+        plot_cluster_line_metrics(pd.DataFrame(dbscan_metrics, columns=METRICS_COLS), "dbscan/" + _name + "_dbscan_features_metrics", "Features",
+                                  "DBSCAN Features Metrics")
+        """
         _clusters = KMeans(n_clusters=3).fit_predict(data_df)
-        KMEANS_SELECTED_FEATS = filterKBest(data_df, f_test(data_df.iloc[LABELED],  _labels[LABELED][:, 1]), 18)
+        KMEANS_SELECTED_FEATS = filterKBest(data_df, f_test(data_df.iloc[LABELED], _labels[LABELED][:, 1]), 18)
         _metrics = []
         best_silhouette = -1
         for n in range(0, 17):
@@ -322,10 +370,10 @@ def experiment(_name, _feats, _labels, feature_selection=False, cluster_iter=0):
             silhouette = m_results[0][2]
             if silhouette >= best_silhouette:
                 best_silhouette = silhouette
-                FINAL_KMEANS_SELECTED_FEATS = KMEANS_SELECTED_FEATS
+                KMEANS_SELECTED = KMEANS_SELECTED_FEATS
             for m in m_results:
                 _metrics.append(m)
-            KMEANS_SELECTED_FEATS = filterKBest(selected_feats, f_test(selected_feats.iloc[LABELED],  _labels[LABELED][:, 1]), 18 - (n + 1))
+            KMEANS_SELECTED_FEATS = filterKBest(selected_feats, f_test(selected_feats.iloc[LABELED], _labels[LABELED][:, 1]), 18 - (n + 1))
         plot_cluster_line_metrics(pd.DataFrame(_metrics, columns=METRICS_COLS), "kmeans/" + _name + "_kmeans_features_metrics", "Features",
                                   "KMeans Features Metrics")
 
@@ -347,8 +395,9 @@ def experiment(_name, _feats, _labels, feature_selection=False, cluster_iter=0):
             DBSCAN_SELECTED_FEATS = filterKBest(selected_feats, f_test(selected_feats, _clusters), 18 - (n + 1))
         plot_cluster_line_metrics(pd.DataFrame(_metrics, columns=METRICS_COLS), "dbscan/" + _name + "_dbscan_features_metrics", "Features",
                                   "DBSCAN Features Metrics")
+        """
 
-    print("Features Selected: " + str(FINAL_KMEANS_SELECTED_FEATS) + ", " + str(FINAL_DBSCAN_SELECTED_FEATS))
+    print("Features Selected: " + str(KMEANS_SELECTED) + ", " + str(FINAL_DBSCAN_SELECTED_FEATS))
 
     # Finding low and highly correlated features
     # LOW_CORR, HIGH_CORR = filter_low_high_corr(data_df.iloc[:, :-1].corr())
@@ -356,22 +405,22 @@ def experiment(_name, _feats, _labels, feature_selection=False, cluster_iter=0):
     # Features correlations
     plot_heatmap(data_df.iloc[:, :-1], _name + "_full_heatmap", "Features Heatmap")
     if feature_selection:
-        plot_heatmap(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS], _name + "_kmeans_feats_heatmap", "Features Heatmap")
+        plot_heatmap(data_df.iloc[:, KMEANS_SELECTED], _name + "_kmeans_feats_heatmap", "Features Heatmap")
         plot_heatmap(data_df.iloc[:, FINAL_DBSCAN_SELECTED_FEATS], _name + "_dbscan_feats_heatmap", "Features Heatmap")
-        _kmeans_clusters = KMeans(n_clusters=3).fit_predict(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS])
+        _kmeans_clusters = KMeans(n_clusters=3).fit_predict(data_df.iloc[:, KMEANS_SELECTED])
         _dbscan_clusters = DBSCAN(eps=best_eps).fit_predict(data_df.iloc[:, FINAL_DBSCAN_SELECTED_FEATS])
 
-        kmeans_best_2_dims = filterKBest(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS],
-                                         f_test(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS], _kmeans_clusters), 2)
-        dbscan_best_2_dims = filterKBest(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS],
-                                         f_test(data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS], _dbscan_clusters), 2)
+        kmeans_best_2_dims = filterKBest(data_df.iloc[:, KMEANS_SELECTED],
+                                         f_test(data_df.iloc[:, KMEANS_SELECTED], _kmeans_clusters), 2)
+        dbscan_best_2_dims = filterKBest(data_df.iloc[:, KMEANS_SELECTED],
+                                         f_test(data_df.iloc[:, KMEANS_SELECTED], _dbscan_clusters), 2)
         print(kmeans_best_2_dims)
 
         _kmeans_plt_data = pd.concat(
-            [data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS].iloc[:, kmeans_best_2_dims], pd.Series(_kmeans_clusters, name='class')],
+            [data_df.iloc[:, KMEANS_SELECTED].iloc[:, kmeans_best_2_dims], pd.Series(_kmeans_clusters, name='class')],
             axis=1)
         _dbscan_plt_data = pd.concat(
-            [data_df.iloc[:, FINAL_KMEANS_SELECTED_FEATS].iloc[:, dbscan_best_2_dims], pd.Series(_dbscan_clusters, name='class')],
+            [data_df.iloc[:, KMEANS_SELECTED].iloc[:, dbscan_best_2_dims], pd.Series(_dbscan_clusters, name='class')],
             axis=1)
     else:
         _kmeans_clusters = KMeans(n_clusters=3).fit_predict(data_df)
