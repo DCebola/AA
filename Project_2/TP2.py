@@ -32,7 +32,8 @@ def create_dir(_path):
 def plot_joint_plot(_data, name, title):
     plt.figure(figsize=(20, 15))
     plt.title(title)
-    sns.jointplot(data=_data, x=_data.columns[0], y=_data.columns[1], hue="class", kind="kde", palette=PALETTE[:_data["class"].unique().size])
+    sns.jointplot(data=_data, x=_data.columns[0], y=_data.columns[1], hue="class", kind="kde",
+                  palette=PALETTE[:_data["class"].unique().size])
     plt.savefig('plots/' + name + '.png', dpi=200, bbox_inches='tight')
     plt.close()
 
@@ -92,7 +93,8 @@ def plot_cluster_line_metrics(_data, name, parameter, title):
     plt.subplots(figsize=(20, 15))
     plt.title(title)
     sns.lineplot(data=_data, x="x", y="y", hue="metric", palette=PALETTE[:_data["metric"].unique().size])
-    sns.scatterplot(data=_data, x="x", y="y", hue="metric", legend=False, palette=PALETTE[:_data["metric"].unique().size])
+    sns.scatterplot(data=_data, x="x", y="y", hue="metric", legend=False,
+                    palette=PALETTE[:_data["metric"].unique().size])
     plt.xlabel(parameter)
     plt.ylabel("Score")
     plt.ylim(0, 1)
@@ -192,6 +194,16 @@ def generate_KMeans_clusters(_data, n_clusters, _true_labels):
     return _metrics, _clusters
 
 
+def generate_Bissecting_KMeans_clusters(_data, max_iter, _true_labels):
+    _metrics = []
+    _clusters = []
+    for n in range(1, max_iter + 1):
+        _clusters = MyBisectingKMeans(n_iter=n).fit_predict(_data)
+        for m in cluster_eval(_data, _clusters, _true_labels, n):
+            _metrics.append(m)
+    return _metrics, _clusters
+
+
 def generate_DBSCAN_clusters(_data, _valleys_dists, _true_labels):
     _metrics = []
     _clusters = []
@@ -275,8 +287,7 @@ def get_reduced_feats_data(_images, N=18):
 
 
 def sequential_backward_elimination(_data, _true_labels, _classifier, _heuristic, _total_feats=18):
-    _clusters = _classifier.fit_predict(_data)
-    CURRENT_SELECTED_FEATS = filterKBest(_data, f_test(_data.iloc[LABELED], _true_labels), _total_feats)
+    CURRENT_SELECTED_FEATS = np.arange(0, _total_feats)
     FINAL_SELECTED_FEATS = []
     _metrics = []
     best = -1
@@ -290,7 +301,8 @@ def sequential_backward_elimination(_data, _true_labels, _classifier, _heuristic
             FINAL_SELECTED_FEATS = CURRENT_SELECTED_FEATS
         for _m in _m_results:
             _metrics.append(_m)
-        CURRENT_SELECTED_FEATS = filterKBest(_selected_feats, f_test(_selected_feats.iloc[LABELED], _true_labels), _total_feats - (_n + 1))
+        CURRENT_SELECTED_FEATS = filterKBest(_selected_feats, f_test(_selected_feats.iloc[LABELED], _true_labels),
+                                             _total_feats - (_n + 1))
     return FINAL_SELECTED_FEATS, _metrics,
 
 
@@ -313,7 +325,7 @@ class MyBisectingKMeans:
         self.n_iter = n_iter
         self.kmeans = KMeans(n_clusters=2)
 
-    def fit_predict(self, _data):
+    def __fit_predict__(self, _data):
         lists_results = []
         indexes = [[]]
 
@@ -341,8 +353,22 @@ class MyBisectingKMeans:
             indexes.append(list(new_cluster0))
             indexes.append(list(new_cluster1))
             indexes.sort(key=sort_by_length, reverse=True)
+        self.list_result = lists_results
+        cluster_results = np.zeros((_data.shape[0],))
+        n_cluster = 0
+        for cluster in indexes:
+            cluster_results[np.array(cluster)] = n_cluster
+            n_cluster += 1
 
-        return indexes, lists_results
+        self.cluster_results = cluster_results
+
+    def fit_predict(self, _data):
+        self.__fit_predict__(_data)
+        return self.cluster_results
+
+    def fit_predict_report(self, _data):
+        self.__fit_predict__(_data)
+        return self.list_result
 
 
 def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=False, cluster_iter=0):
@@ -354,6 +380,7 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
     data_df = pd.DataFrame(np.column_stack([_feats, _labels[:, -1]]), columns=DATA_COLS)
     kmeans_data_df = data_df
     dbscan_data_df = data_df
+    bissec_data_df = data_df
     if feature_selection:
         if corr_filter:
             _name = "SELECTED_LOW_" + _name
@@ -378,17 +405,28 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
     # ----------------------------------------------------SEQUENTIAL BACKWARD ELIMINATION-------------------------------------------------------------
     if feature_selection:
         heuristic = MyHeuristic(HEURISTIC_VALUES, HEURISTIC_WEIGHTS)
-        KMEANS_SELECTED, kmeans_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1], KMeans(n_clusters=3), heuristic)
-        DBSCAN_SELECTED, dbscan_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1], DBSCAN(eps=best_eps), heuristic)
+        KMEANS_SELECTED, kmeans_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1],
+                                                                          KMeans(n_clusters=3), heuristic)
+        DBSCAN_SELECTED, dbscan_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1],
+                                                                          DBSCAN(eps=best_eps), heuristic)
+        BISSECT_SELECTED, bissec_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1],
+                                                                          MyBisectingKMeans(n_iter=3), heuristic)
         print(str(KMEANS_SELECTED) + "," + str(len(KMEANS_SELECTED)))
         print(str(DBSCAN_SELECTED) + "," + str(len(DBSCAN_SELECTED)))
+        print(str(BISSECT_SELECTED) + "," + str(len(BISSECT_SELECTED)))
         kmeans_data_df = data_df.iloc[:, KMEANS_SELECTED]
         dbscan_data_df = data_df.iloc[:, DBSCAN_SELECTED]
+        bissec_data_df = data_df.iloc[:, BISSECT_SELECTED]
         # Plotting cluster metrics as a function of the number of the remaining best features
-        plot_cluster_line_metrics(pd.DataFrame(kmeans_metrics, columns=METRICS_COLS), "kmeans/" + _name + "_kmeans_features_metrics", "Features",
+        plot_cluster_line_metrics(pd.DataFrame(kmeans_metrics, columns=METRICS_COLS),
+                                  "kmeans/" + _name + "_kmeans_features_metrics", "Features",
                                   "KMeans Features Metrics")
-        plot_cluster_line_metrics(pd.DataFrame(dbscan_metrics, columns=METRICS_COLS), "dbscan/" + _name + "_dbscan_features_metrics", "Features",
+        plot_cluster_line_metrics(pd.DataFrame(dbscan_metrics, columns=METRICS_COLS),
+                                  "dbscan/" + _name + "_dbscan_features_metrics", "Features",
                                   "DBSCAN Features Metrics")
+        plot_cluster_line_metrics(pd.DataFrame(bissec_metrics, columns=METRICS_COLS),
+                                  "bissecting/" + _name + "_bissecting_features_metrics", "Features",
+                                  "Bissecting KMeans Features Metrics")
 
     # -----------------------------------------------------------CORRELATION FILTERING----------------------------------------------------------------
     if corr_filter:
@@ -396,38 +434,54 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         if feature_selection:
             kmeans_data_df = kmeans_data_df.iloc[:, filter_low_high_corr(kmeans_data_df.corr())[0]]
             dbscan_data_df = dbscan_data_df.iloc[:, filter_low_high_corr(dbscan_data_df.corr())[0]]
+            bissec_data_df = bissec_data_df.iloc[:, filter_low_high_corr(bissec_data_df.corr())[0]]
+        else:
+            kmeans_data_df = data_df
+            dbscan_data_df = data_df
+            bissec_data_df = data_df
 
     # Plotting features' correlation heatmap
     plot_heatmap(data_df.iloc[:, :-1], _name + "_full_heatmap", "Features Heatmap")
     if feature_selection:
         plot_heatmap(kmeans_data_df, _name + "_kmeans_feats_heatmap", "Features Heatmap")
         plot_heatmap(dbscan_data_df, _name + "_dbscan_feats_heatmap", "Features Heatmap")
+        plot_heatmap(bissec_data_df, _name + "_bissecting_feats_heatmap", "Features Heatmap")
 
     # ________________________________________________________________________________________________________________________________________________
     # -----------------------------------------------------------CLUSTER GENERATION-------------------------------------------------------------------
     # Generating clusters with the best estimated parameters
     _kmeans_clusters = KMeans(n_clusters=3).fit_predict(kmeans_data_df)
     _dbscan_clusters = DBSCAN(eps=best_eps).fit_predict(dbscan_data_df)
-    # _bisecting_clusters = MyBisectingKMeans(n_iter=5).fit_predict(data_df)
+    _bisecting_report_clusters = MyBisectingKMeans(n_iter=2).fit_predict_report(data_df)
+    _bisecting_clusters = MyBisectingKMeans(n_iter=2).fit_predict(data_df)
+
     kmeans_best_2_dims = filterKBest(kmeans_data_df, f_test(kmeans_data_df, _kmeans_clusters), 2)
     dbscan_best_2_dims = filterKBest(dbscan_data_df, f_test(dbscan_data_df, _dbscan_clusters), 2)
-    _kmeans_plt_data = pd.concat([kmeans_data_df.iloc[:, kmeans_best_2_dims], pd.Series(_kmeans_clusters, name='class')], axis=1)
-    _dbscan_plt_data = pd.concat([dbscan_data_df.iloc[:, dbscan_best_2_dims], pd.Series(_dbscan_clusters, name='class')], axis=1)
+    bissecting_best_2_dims = filterKBest(bissec_data_df, f_test(bissec_data_df, _bisecting_clusters), 2)
+    _kmeans_plt_data = pd.concat(
+        [kmeans_data_df.iloc[:, kmeans_best_2_dims], pd.Series(_kmeans_clusters, name='class')], axis=1)
+    _dbscan_plt_data = pd.concat(
+        [dbscan_data_df.iloc[:, dbscan_best_2_dims], pd.Series(_dbscan_clusters, name='class')], axis=1)
+    _bissecting_plt_data = pd.concat(
+        [bissec_data_df.iloc[:, bissecting_best_2_dims], pd.Series(_bisecting_clusters, name='class')], axis=1)
 
     # Plotting clusters with dimensionality reduction (keeping the two features with the highest f-score)
     plot_joint_plot(_kmeans_plt_data, "kmeans/" + _name + "_clusters", "Kmeans")
     plot_joint_plot(_dbscan_plt_data, "dbscan/" + _name + "_clusters", "DBSCAN")
+    plot_joint_plot(_bissecting_plt_data, "bissecting/" + _name + "_clusters", "Bissecting KMeans")
     # Generating cluster reports
     utils.report_clusters(_labels[:, 0], _kmeans_clusters, "clusters/" + _name + "_kmeans_clusters.html")
     utils.report_clusters(_labels[:, 0], _dbscan_clusters, "clusters/" + _name + "_dbscan_clusters.html")
-    # utils.report_clusters_hierarchical(_labels[:, 0], _bisecting_clusters, "clusters/" + _name + "_bisecting_kmeans_clusters.html")
+    utils.report_clusters_hierarchical(_labels[:, 0], _bisecting_report_clusters,
+                                       "clusters/" + _name + "_bisecting_kmeans_clusters.html")
 
     # ________________________________________________________________________________________________________________________________________________
     # ------------------------------------------------------Cluster Parameter Evaluation--------------------------------------------------------------
     if cluster_iter > 0:
         # KMeans
-        kmeans_metrics_df = pd.DataFrame(generate_KMeans_clusters(kmeans_data_df, cluster_iter, labels[LABELED][:, 1])[0],
-                                         columns=METRICS_COLS)
+        kmeans_metrics_df = pd.DataFrame(
+            generate_KMeans_clusters(kmeans_data_df, cluster_iter, labels[LABELED][:, 1])[0],
+            columns=METRICS_COLS)
         # DBSCAN
         eps_range = []
         for num in np.arange(0, best_eps, best_eps / cluster_iter):
@@ -436,9 +490,17 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         dbscan_metrics_df = pd.DataFrame(generate_DBSCAN_clusters(dbscan_data_df, eps_range, labels[LABELED][:, 1])[0],
                                          columns=METRICS_COLS)
         # Bisecting K-Means
+        bissecting_metrics_df = pd.DataFrame(
+            generate_Bissecting_KMeans_clusters(bissec_data_df, cluster_iter, labels[LABELED][:, 1])[0],
+            columns=METRICS_COLS)
+
         # Other
-        plot_cluster_line_metrics(kmeans_metrics_df, "/kmeans/" + _name + "_kmeans_parameter_metrics", "Clusters", "KMeans Cluster Metrics")
-        plot_cluster_line_metrics(dbscan_metrics_df, "/dbscan/" + _name + "_dbscan_parameter_metrics", "ε", "DBSCAN Cluster Metrics")
+        plot_cluster_line_metrics(kmeans_metrics_df, "/kmeans/" + _name + "_kmeans_parameter_metrics", "Clusters",
+                                  "KMeans Cluster Metrics")
+        plot_cluster_line_metrics(dbscan_metrics_df, "/dbscan/" + _name + "_dbscan_parameter_metrics", "ε",
+                                  "DBSCAN Cluster Metrics")
+        plot_cluster_line_metrics(bissecting_metrics_df, "/bissecting/" + _name + "_bissecting_KMeans_parameter_metrics", "Iterations",
+                                  "Bissecting KMeans Cluster Metrics")
     # ________________________________________________________________________________________________________________________________________________
 
 
@@ -458,12 +520,13 @@ create_dir("data")
 create_dir("plots")
 create_dir("plots/kmeans")
 create_dir("plots/dbscan")
+create_dir("plots/bissecting")
 create_dir("clusters")
 
 original_feats = get_original_feats_data(images)
 experiment("original", original_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
 # experiment("standardized", standardize(original_feats), labels, feature_selection=True, corr_filter=False, cluster_iter=10)
-# experiment("normalized", original_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+# experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
 """
 for n in [10, 50, 250]:
     reduced_feats, restored_feats = get_reduced_feats_data(images, n)
