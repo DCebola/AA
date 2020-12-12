@@ -285,15 +285,13 @@ def sequential_backward_elimination(_data, _true_labels, _classifier, _heuristic
         _clusters = _classifier.fit_predict(_selected_feats)
         _m_results = cluster_eval(_selected_feats, _clusters, _true_labels, _total_feats - _n)
         found = _heuristic.get_score(_m_results)
-        print("FOUND: ", found)
         if found >= best:
-            print("BEST: ", found)
             best = found
             FINAL_SELECTED_FEATS = CURRENT_SELECTED_FEATS
         for _m in _m_results:
             _metrics.append(_m)
         CURRENT_SELECTED_FEATS = filterKBest(_selected_feats, f_test(_selected_feats.iloc[LABELED], _true_labels), _total_feats - (_n + 1))
-    return FINAL_SELECTED_FEATS, _metrics
+    return FINAL_SELECTED_FEATS, _metrics,
 
 
 class MyHeuristic:
@@ -382,8 +380,8 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         heuristic = MyHeuristic(HEURISTIC_VALUES, HEURISTIC_WEIGHTS)
         KMEANS_SELECTED, kmeans_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1], KMeans(n_clusters=3), heuristic)
         DBSCAN_SELECTED, dbscan_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1], DBSCAN(eps=best_eps), heuristic)
-        print(KMEANS_SELECTED)
-        print(DBSCAN_SELECTED)
+        print(str(KMEANS_SELECTED) + "," + str(len(KMEANS_SELECTED)))
+        print(str(DBSCAN_SELECTED) + "," + str(len(DBSCAN_SELECTED)))
         kmeans_data_df = data_df.iloc[:, KMEANS_SELECTED]
         dbscan_data_df = data_df.iloc[:, DBSCAN_SELECTED]
         # Plotting cluster metrics as a function of the number of the remaining best features
