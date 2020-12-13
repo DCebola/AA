@@ -239,11 +239,12 @@ def save_images(_path, _images):
         i += 1
 
 
-def gkern(l=5, sig=1.):
+def gaussian_kernel(l=5, sig=1.):
     ax = np.linspace(-(l - 1) / 2., (l - 1) / 2., l)
     xx, yy = np.meshgrid(ax, ax)
-    kernel = np.exp(-0.5 * (np.square(xx) + np.square(yy)) / np.square(sig))
-    return kernel / np.sum(kernel)
+    _kernel = np.exp(-0.5 * (np.square(xx) + np.square(yy)) / np.square(sig))
+    _kernel = _kernel / np.sum(_kernel)
+    return _kernel.reshape((_kernel.shape[0] ** 2))
 
 
 def agglomerate_images_pixels(_images, N=18):
@@ -563,15 +564,17 @@ create_dir("plots/dbscan")
 create_dir("plots/bisecting")
 create_dir("plots/spectral")
 create_dir("clusters")
-
-kernel = gkern(50,6)
-filter_image = lambda t: t * kernel
-vfunc = np.vectorize(filter_image)
-print(images[0])
-vfunc(images)
-print(images[0])
+create_dir("filtered_images")
+kernel = gaussian_kernel(50, 4.5) * 255
+imsave("kernel.png", kernel.reshape((50, 50)))
+for i in range(images.shape[0]):
+    images[i] = images[i] * kernel
+i = 0
+for img in images[:]:
+    imsave("filtered_images/" + str(i) + ".png", img.reshape((50, 50)))
+    i += 1
 original_feats = get_original_feats_data(images)
-# experiment("original", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+experiment("original", normalize(original_feats), labels, feature_selection=False, corr_filter=False, cluster_iter=10)
 # experiment("standardized", standardize(original_feats), labels, feature_selection=True, corr_filter=False, cluster_iter=10)
 # experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
 # for n in [10, 50, 250]:
