@@ -1,5 +1,4 @@
 import tp2_aux as utils
-import numpy as np
 import pandas as pd
 import pickle
 from os import path, mkdir
@@ -8,8 +7,9 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, Isomap
 from sklearn.feature_selection import f_classif
 from sklearn.feature_extraction.image import grid_to_graph
-from sklearn.cluster import KMeans, DBSCAN, FeatureAgglomeration, AgglomerativeClustering
+from sklearn.cluster import KMeans, DBSCAN, FeatureAgglomeration, SpectralClustering
 from scipy.signal import find_peaks_cwt
+import numpy as np
 from skimage.io import imsave
 from skimage.transform import resize
 import matplotlib.pyplot as plt
@@ -190,11 +190,11 @@ def generate_KMeans_clusters(_data, n_clusters, _true_labels):
     return _metrics, _clusters
 
 
-def generate_Agglomerative_clusters(_data, n_clusters, _true_labels):
+def generate_Spectral_clusters(_data, n_iter, _true_labels):
     _metrics = []
     _clusters = []
-    for n in range(2, n_clusters + 1):
-        _clusters = AgglomerativeClustering(n_clusters=n).fit_predict(_data)
+    for n in range(10, n_iter * 10 + 1, 10):
+        _clusters = SpectralClustering(n_clusters=3, n_init=n).fit_predict(_data.to_numpy())
         for m in cluster_eval(_data, _clusters, _true_labels, n):
             _metrics.append(m)
     return _metrics, _clusters
@@ -204,7 +204,7 @@ def generate_Bisecting_KMeans_clusters(_data, max_iter, _true_labels):
     _metrics = []
     _clusters = []
     for n in range(1, max_iter + 1):
-        _clusters = MyBisectingKMeans(n_iter=n).fit_predict(_data)
+        _clusters = MyBisectingKMeans(n_iter=n).fit_predict(_data.to_numpy())
         for m in cluster_eval(_data, _clusters, _true_labels, n):
             _metrics.append(m)
     return _metrics, _clusters
@@ -237,6 +237,13 @@ def save_images(_path, _images):
         imsave(_path + str(i) + ".png", resize(np.reshape(_image, get_factors(_image.shape[0])), (50, 50),
                                                order=0, preserve_range=True, anti_aliasing=False).astype('uint8'))
         i += 1
+
+
+def gkern(l=5, sig=1.):
+    ax = np.linspace(-(l - 1) / 2., (l - 1) / 2., l)
+    xx, yy = np.meshgrid(ax, ax)
+    kernel = np.exp(-0.5 * (np.square(xx) + np.square(yy)) / np.square(sig))
+    return kernel / np.sum(kernel)
 
 
 def agglomerate_images_pixels(_images, N=18):
@@ -293,14 +300,14 @@ def get_reduced_feats_data(_images, N=18):
 
 
 def sequential_backward_elimination(_data, _true_labels, _classifier, _heuristic, _total_feats=18):
-    _clusters = _classifier.fit_predict(_data)
+    _clusters = _classifier.fit_predict(_data.to_numpy())
     CURRENT_SELECTED_FEATS = filterKBest(_data, f_test(_data.iloc[LABELED], _true_labels), _total_feats)
     FINAL_SELECTED_FEATS = []
     _metrics = []
     best = -1
     for _n in range(0, _total_feats - 1):
         _selected_feats = _data.iloc[:, CURRENT_SELECTED_FEATS]
-        _clusters = _classifier.fit_predict(_selected_feats)
+        _clusters = _classifier.fit_predict(_selected_feats.to_numpy())
         _m_results = cluster_eval(_selected_feats, _clusters, _true_labels, _total_feats - _n)
         found = _heuristic.get_score(_m_results)
         if found >= best:
@@ -308,7 +315,7 @@ def sequential_backward_elimination(_data, _true_labels, _classifier, _heuristic
             FINAL_SELECTED_FEATS = CURRENT_SELECTED_FEATS
         for _m in _m_results:
             _metrics.append(_m)
-        CURRENT_SELECTED_FEATS = filterKBest(_selected_feats, f_test(_selected_feats.iloc[LABELED], _true_labels),
+        CURRENT_SELECTED_FEATS = filterKBest(_selected_feats, f_test(_selected_feats, _clusters),
                                              _total_feats - (_n + 1))
     return FINAL_SELECTED_FEATS, _metrics
 
@@ -346,7 +353,7 @@ class MyBisectingKMeans:
 
         # indexes = [[0,1,2,3,4,5,6,7,8,9], [...], ...]
         for example in range(self.n_iter):
-            predict = self.kmeans.fit_predict(_data.iloc[indexes[cluster_to_divide]])
+            predict = self.kmeans.fit_predict(_data[indexes[cluster_to_divide]])
 
             new_cluster0 = np.array(indexes[cluster_to_divide])[np.where(predict == 0)[0]]
             new_cluster1 = np.array(indexes[cluster_to_divide])[np.where(predict == 1)[0]]
@@ -388,7 +395,7 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
     kmeans_data_df = data_df
     dbscan_data_df = data_df
     bisec_data_df = data_df
-    agglomerative_data_df = data_df
+    spectral_data_df = data_df
     if feature_selection:
         if corr_filter:
             _name = "SELECTED_LOW_" + _name
@@ -419,17 +426,17 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
                                                                           DBSCAN(eps=best_eps), heuristic)
         BISECT_SELECTED, bisec_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1],
                                                                          MyBisectingKMeans(n_iter=3), heuristic)
-        AGGLOMERATIVE_SELECTED, agglomerative_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1],
-                                                                                        AgglomerativeClustering(n_clusters=3),
-                                                                                        heuristic)
+        SPECTRAL_SELECTED, spectrals_metrics = sequential_backward_elimination(data_df, _labels[LABELED][:, 1],
+                                                                               SpectralClustering(n_clusters=3),
+                                                                               heuristic)
         print(str(KMEANS_SELECTED) + "," + str(len(KMEANS_SELECTED)))
         print(str(DBSCAN_SELECTED) + "," + str(len(DBSCAN_SELECTED)))
         print(str(BISECT_SELECTED) + "," + str(len(BISECT_SELECTED)))
-        print(str(AGGLOMERATIVE_SELECTED) + "," + str(len(AGGLOMERATIVE_SELECTED)))
+        print(str(SPECTRAL_SELECTED) + "," + str(len(SPECTRAL_SELECTED)))
         kmeans_data_df = data_df.iloc[:, KMEANS_SELECTED]
         dbscan_data_df = data_df.iloc[:, DBSCAN_SELECTED]
         bisec_data_df = data_df.iloc[:, BISECT_SELECTED]
-        agglomerative_data_df = data_df.iloc[:, AGGLOMERATIVE_SELECTED]
+        spectral_data_df = data_df.iloc[:, SPECTRAL_SELECTED]
         # Plotting cluster metrics as a function of the number of the remaining best features
         plot_cluster_line_metrics(pd.DataFrame(kmeans_metrics, columns=METRICS_COLS),
                                   "kmeans/" + _name + "_kmeans_features_metrics", "Features",
@@ -440,9 +447,9 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         plot_cluster_line_metrics(pd.DataFrame(bisec_metrics, columns=METRICS_COLS),
                                   "bisecting/" + _name + "_bisecting_features_metrics", "Features",
                                   "Bisecting KMeans Features Metrics")
-        plot_cluster_line_metrics(pd.DataFrame(agglomerative_metrics, columns=METRICS_COLS),
-                                  "agglomerative/" + _name + "_agglomerative_features_metrics", "Features",
-                                  "Agglomerative Features Metrics")
+        plot_cluster_line_metrics(pd.DataFrame(spectrals_metrics, columns=METRICS_COLS),
+                                  "spectral/" + _name + "_spectral_features_metrics", "Features",
+                                  "Spectral Features Metrics")
 
     # -----------------------------------------------------------CORRELATION FILTERING----------------------------------------------------------------
     if corr_filter:
@@ -451,12 +458,12 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
             kmeans_data_df = kmeans_data_df.iloc[:, filter_low_high_corr(kmeans_data_df.corr())[0]]
             dbscan_data_df = dbscan_data_df.iloc[:, filter_low_high_corr(dbscan_data_df.corr())[0]]
             bisec_data_df = bisec_data_df.iloc[:, filter_low_high_corr(bisec_data_df.corr())[0]]
-            agglomerative_data_df = bisec_data_df.iloc[:, filter_low_high_corr(agglomerative_data_df.corr())[0]]
+            spectral_data_df = spectral_data_df.iloc[:, filter_low_high_corr(spectral_data_df.corr())[0]]
         else:
             kmeans_data_df = data_df
             dbscan_data_df = data_df
             bisec_data_df = data_df
-            agglomerative_data_df = data_df
+            spectral_data_df = data_df
 
     # Plotting features' correlation heatmap
     plot_heatmap(data_df.iloc[:, :-1], _name + "_full_heatmap", "Features Heatmap")
@@ -464,21 +471,21 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         plot_heatmap(kmeans_data_df, _name + "_kmeans_feats_heatmap", "Features Heatmap")
         plot_heatmap(dbscan_data_df, _name + "_dbscan_feats_heatmap", "Features Heatmap")
         plot_heatmap(bisec_data_df, _name + "_bisecting_feats_heatmap", "Features Heatmap")
-        plot_heatmap(agglomerative_data_df, _name + "_agglomerative_feats_heatmap", "Features Heatmap")
+        plot_heatmap(spectral_data_df, _name + "_spectral_feats_heatmap", "Features Heatmap")
 
     # ________________________________________________________________________________________________________________________________________________
     # -----------------------------------------------------------CLUSTER GENERATION-------------------------------------------------------------------
     # Generating clusters with the best estimated parameters
     _kmeans_clusters = KMeans(n_clusters=3).fit_predict(kmeans_data_df)
     _dbscan_clusters = DBSCAN(eps=best_eps).fit_predict(dbscan_data_df)
-    _bisecting_report_clusters = MyBisectingKMeans(n_iter=2).fit_predict_report(bisec_data_df)
-    _bisecting_clusters = MyBisectingKMeans(n_iter=2).fit_predict(bisec_data_df)
-    _agglomerative_clusters = AgglomerativeClustering(n_clusters=3).fit_predict(agglomerative_data_df)
+    _bisecting_report_clusters = MyBisectingKMeans(n_iter=2).fit_predict_report(bisec_data_df.to_numpy())
+    _bisecting_clusters = MyBisectingKMeans(n_iter=2).fit_predict(bisec_data_df.to_numpy())
+    _spectral_clusters = SpectralClustering(n_clusters=3).fit_predict(spectral_data_df.to_numpy())
 
     kmeans_best_2_dims = filterKBest(kmeans_data_df, f_test(kmeans_data_df, _kmeans_clusters), 2)
     dbscan_best_2_dims = filterKBest(dbscan_data_df, f_test(dbscan_data_df, _dbscan_clusters), 2)
     bisecting_best_2_dims = filterKBest(bisec_data_df, f_test(bisec_data_df, _bisecting_clusters), 2)
-    agglomerative_best_2_dims = filterKBest(agglomerative_data_df, f_test(agglomerative_data_df, _agglomerative_clusters), 2)
+    spectral_best_2_dims = filterKBest(spectral_data_df, f_test(spectral_data_df, _spectral_clusters), 2)
 
     _kmeans_plt_data = pd.concat(
         [kmeans_data_df.iloc[:, kmeans_best_2_dims], pd.Series(_kmeans_clusters, name='class')], axis=1)
@@ -486,20 +493,20 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         [dbscan_data_df.iloc[:, dbscan_best_2_dims], pd.Series(_dbscan_clusters, name='class')], axis=1)
     _bisecting_plt_data = pd.concat(
         [bisec_data_df.iloc[:, bisecting_best_2_dims], pd.Series(_bisecting_clusters, name='class')], axis=1)
-    _agglomerative_plt_data = pd.concat(
-        [agglomerative_data_df.iloc[:, agglomerative_best_2_dims], pd.Series(_agglomerative_clusters, name='class')], axis=1)
+    _spectral_plt_data = pd.concat(
+        [spectral_data_df.iloc[:, spectral_best_2_dims], pd.Series(_spectral_clusters, name='class')], axis=1)
 
     # Plotting clusters with dimensionality reduction (keeping the two features with the highest f-score)
     plot_joint_plot(_kmeans_plt_data, "kmeans/" + _name + "_clusters", "Kmeans")
     plot_joint_plot(_dbscan_plt_data, "dbscan/" + _name + "_clusters", "DBSCAN")
     plot_joint_plot(_bisecting_plt_data, "bisecting/" + _name + "_clusters", "Bisecting KMeans")
-    plot_joint_plot(_agglomerative_plt_data, "agglomerative/" + _name + "_clusters", "Agglomerative")
+    plot_joint_plot(_spectral_plt_data, "spectral/" + _name + "_clusters", "Spectral Clustering")
     # Generating cluster reports
     utils.report_clusters(_labels[:, 0], _kmeans_clusters, "clusters/" + _name + "_kmeans_clusters.html")
     utils.report_clusters(_labels[:, 0], _dbscan_clusters, "clusters/" + _name + "_dbscan_clusters.html")
     utils.report_clusters_hierarchical(_labels[:, 0], _bisecting_report_clusters,
                                        "clusters/" + _name + "_bisecting_kmeans_clusters.html")
-    utils.report_clusters(_labels[:, 0], _agglomerative_clusters, "clusters/" + _name + "_agglomerative_clusters.html")
+    utils.report_clusters(_labels[:, 0], _spectral_clusters, "clusters/" + _name + "_spectral_clusters.html")
 
     # ________________________________________________________________________________________________________________________________________________
     # ------------------------------------------------------Cluster Parameter Evaluation--------------------------------------------------------------
@@ -519,19 +526,21 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         bisecting_metrics_df = pd.DataFrame(
             generate_Bisecting_KMeans_clusters(bisec_data_df, cluster_iter, labels[LABELED][:, 1])[0],
             columns=METRICS_COLS)
-        # agglomerative
-        agglomerative_metrics_df = pd.DataFrame(
-            generate_Agglomerative_clusters(agglomerative_data_df, cluster_iter, labels[LABELED][:, 1])[0],
+        # Spectral
+        spectral_metrics_df = pd.DataFrame(
+            generate_Spectral_clusters(spectral_data_df, cluster_iter, labels[LABELED][:, 1])[0],
             columns=METRICS_COLS)
 
         plot_cluster_line_metrics(kmeans_metrics_df, "/kmeans/" + _name + "_kmeans_parameter_metrics", "Clusters",
                                   "KMeans Cluster Metrics")
         plot_cluster_line_metrics(dbscan_metrics_df, "/dbscan/" + _name + "_dbscan_parameter_metrics", "ε",
                                   "DBSCAN Cluster Metrics")
-        plot_cluster_line_metrics(bisecting_metrics_df, "/bisecting/" + _name + "_bisecting_KMeans_parameter_metrics", "Iterations",
+        plot_cluster_line_metrics(bisecting_metrics_df, "/bisecting/" + _name + "_bisecting_KMeans_parameter_metrics",
+                                  "Iterations",
                                   "Bisecting KMeans Cluster Metrics")
-        plot_cluster_line_metrics(agglomerative_metrics_df, "/agglomerative/" + _name + "_agglomerative_parameter_metrics", "Clusters",
-                                  "Agglomerative Cluster Metrics")
+        plot_cluster_line_metrics(spectral_metrics_df, "/spectral/" + _name + "_spectral_parameter_metrics",
+                                  "KMeans Iterations",
+                                  "Spectral Cluster Metrics")
     # ________________________________________________________________________________________________________________________________________________
 
 
@@ -552,16 +561,20 @@ create_dir("plots")
 create_dir("plots/kmeans")
 create_dir("plots/dbscan")
 create_dir("plots/bisecting")
-create_dir("plots/agglomerative")
+create_dir("plots/spectral")
 create_dir("clusters")
 
+kernel = gkern(50,6)
+filter_image = lambda t: t * kernel
+vfunc = np.vectorize(filter_image)
+print(images[0])
+vfunc(images)
+print(images[0])
 original_feats = get_original_feats_data(images)
-experiment("original", original_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+# experiment("original", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
 # experiment("standardized", standardize(original_feats), labels, feature_selection=True, corr_filter=False, cluster_iter=10)
 # experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
-"""
-for n in [10, 50, 250]:
-    reduced_feats, restored_feats = get_reduced_feats_data(images, n)
-    experiment(str(n) + "_reduced", reduced_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
-    experiment(str(n) + "_restored", restored_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
-"""
+# for n in [10, 50, 250]:
+#    reduced_feats, restored_feats = get_reduced_feats_data(images, n)
+# experiment(str(n) + "_reduced", reduced_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+# experiment(str(n) + "_restored", restored_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
