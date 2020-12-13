@@ -558,6 +558,8 @@ labels = np.loadtxt("labels.txt", delimiter=",")
 LABELED = np.where(labels[:, -1] != 0)
 images = utils.images_as_matrix()
 create_dir("data")
+create_dir("data/reduced")
+create_dir("data/restored")
 create_dir("plots")
 create_dir("plots/kmeans")
 create_dir("plots/dbscan")
@@ -574,10 +576,12 @@ for img in images[:]:
     i += 1
 """
 original_feats = get_original_feats_data(images)
-experiment("original", normalize(original_feats), labels, feature_selection=False, corr_filter=False, cluster_iter=10)
-# experiment("standardized", standardize(original_feats), labels, feature_selection=True, corr_filter=False, cluster_iter=10)
-# experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
-# for n in [10, 50, 250]:
-#    reduced_feats, restored_feats = get_reduced_feats_data(images, n)
-# experiment(str(n) + "_reduced", reduced_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
-# experiment(str(n) + "_restored", restored_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+experiment("original", original_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+experiment("standardized", standardize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+"""
+for n in [10, 50, 250]:
+    reduced_feats, restored_feats = get_reduced_feats_data(images, n)
+    experiment(str(n) + "_reduced", reduced_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+    experiment(str(n) + "_restored", restored_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+"""
