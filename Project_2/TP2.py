@@ -503,11 +503,11 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
     plot_joint_plot(_bisecting_plt_data, "bisecting/" + _name + "_clusters", "Bisecting KMeans")
     plot_joint_plot(_spectral_plt_data, "spectral/" + _name + "_clusters", "Spectral Clustering")
     # Generating cluster reports
-    utils.report_clusters(_labels[:, 0], _kmeans_clusters, _name + "_kmeans_clusters.html")
-    utils.report_clusters(_labels[:, 0], _dbscan_clusters, _name + "_dbscan_clusters.html")
+    utils.report_clusters(_labels[:, 0], _kmeans_clusters, "clusters/" + _name + "_kmeans_clusters.html")
+    utils.report_clusters(_labels[:, 0], _dbscan_clusters, "clusters/" + _name + "_dbscan_clusters.html")
     utils.report_clusters_hierarchical(_labels[:, 0], _bisecting_report_clusters,
-                                       _name + "_bisecting_kmeans_clusters.html")
-    utils.report_clusters(_labels[:, 0], _spectral_clusters, _name + "_spectral_clusters.html")
+                                       "clusters/" + _name + "_bisecting_kmeans_clusters.html")
+    utils.report_clusters(_labels[:, 0], _spectral_clusters, "clusters/" + _name + "_spectral_clusters.html")
 
     # ________________________________________________________________________________________________________________________________________________
     # ------------------------------------------------------Cluster Parameter Evaluation--------------------------------------------------------------
@@ -566,6 +566,7 @@ create_dir("plots/dbscan")
 create_dir("plots/bisecting")
 create_dir("plots/spectral")
 create_dir("filtered_images")
+create_dir("clusters")
 """
 kernel = gaussian_kernel(50, 4.5) * 255
 for i in range(images.shape[0]):
@@ -576,9 +577,9 @@ for img in images[:]:
     i += 1
 """
 original_feats = get_original_feats_data(images)
-experiment("original", original_feats, labels, feature_selection=True, corr_filter=True, cluster_iter=10)
-experiment("standardized", standardize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
-experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
+experiment("original", original_feats, labels, feature_selection=False, corr_filter=False, cluster_iter=10)
+experiment("standardized", standardize(original_feats), labels, feature_selection=False, corr_filter=False, cluster_iter=10)
+experiment("normalized", normalize(original_feats), labels, feature_selection=False, corr_filter=False, cluster_iter=10)
 """
 for n in [10, 50, 250]:
     reduced_feats, restored_feats = get_reduced_feats_data(images, n)

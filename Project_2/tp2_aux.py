@@ -35,7 +35,7 @@ def report_clusters(ids, labels, report_file):
         html.append(f"<h1>Cluster {lbl}</h1>")
         lbl_imgs = ids[labels == lbl]
         for count, img in enumerate(lbl_imgs):
-            html.append(f'<img src="images/{int(img)}.png" />')
+            html.append(f'<img src="../images/{int(img)}.png" />')
             # if count % 10 == 9:
             #    html.append('<br/>')
     html.append("</body></html>")
@@ -57,7 +57,7 @@ def cluster_div(prev, ids, lbl_lists):
         current_indexes = [ix for ix in indexes if len(lbl_lists[ix]) == 1]
         next_indexes = [ix for ix in indexes if len(lbl_lists[ix]) > 1]
         for ix in current_indexes:
-            div.append(f'<img src="images/{int(ids[ix])}.png" />')
+            div.append(f'<img src="../images/{int(ids[ix])}.png" />')
         if len(next_indexes) > 0:
             # print(f'**{prev}**\n',indexes,'\n  ',current_indexes,'\n   ',next_indexes, len(next_indexes))
             next_ids = [ids[ix] for ix in next_indexes]
