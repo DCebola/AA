@@ -579,7 +579,7 @@ for img in images[:]:
 """
 # Uncomment which experiment to run
 
-# original_feats = get_original_feats_data(images)
+original_feats = get_original_feats_data(images)
 # experiment("experiment", original_feats, labels, feature_selection=False, corr_filter=True, cluster_iter=10)
 
 """
