@@ -71,8 +71,25 @@ From the results obtain we recommend the K-Means algorithm over the DBSCAN algor
 Q8: Consider other clustering algorithms embedded in the Scikit-Learn library.
 Choose one and apply it to this problem, optimizing the parameters you deem appropriate in the way that you find adequate.
 Justify your choices and discuss whether this option would yield more useful results for biologists.
-R8:
+R8: We chose the Spectral Clustering algorithm because we could still control the number of clusters to generate and it was adequate for the number of samples/clusters.
+It uses a distance graph which means normalizing the features would benefit its performance just like in K-Means.
+We fixed the number of clusters to generate to 3 and tried to experiment with different values for the number of K-Means iterations and number of Neighbours to each point.
+We observed that varying these parameters did not yield any different results, so we decided to not vary any parameter and just keep them with the default value.
+Overall, it performed similarly with the K-Means algorithm, so it is as useful as the K-Means algorithm for the biologists.
+
+Not satisfied with these results, we tried to apply the previous suggestion that we gave in question 6. The results were quite fascinating and inline with what we expected.
+Applying the filter yielded better results even without feature selection. In fact, feature selection actually created worse clusters meaning it could be "overfitting" the algorithm to the labels given by the biologists.
+The best results were found using spectral clustering without feature selection over normalized features. In these clusters we could clearly identify the three phases with little error.
+
+spectral_clusters.html
+kmeans_clusters.html
+dbscan_clusters.html
+spectral_clusters_with_kernel.html
+kmeans_clusters_with_kernel.html
+dbscan_clusters_with_kernel.html
+
 
 Q9: (Optional) Implement the Bissecting K-Means hierarchical clustering algorithm as described in the assignment page and Lecture 19.
 Examine and discuss the results and their application to the problem of helping the biologists select and classify cell images.
-R9:
+R9: After implementation and testing the Bissecting K-Means hierarchical clustering algorithm we found that it yielded similar results to the ones provided by the K-Means algorithm.
+It would be useful if, for the same phase of cell division, sub-categories wanted to be found.

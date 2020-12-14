@@ -194,16 +194,6 @@ def generate_KMeans_clusters(_data, n_clusters, _true_labels):
     return _metrics, _clusters
 
 
-def generate_Spectral_clusters(_data, n_iter, _true_labels):
-    _metrics = []
-    _clusters = []
-    for n in range(0, n_iter + 1):
-        _clusters = SpectralClustering(n_clusters=3, n_neighbors=n).fit_predict(_data.to_numpy())
-        for m in cluster_eval(_data, _clusters, _true_labels, n):
-            _metrics.append(m)
-    return _metrics, _clusters
-
-
 def generate_Bisecting_KMeans_clusters(_data, max_iter, _true_labels):
     _metrics = []
     _clusters = []
@@ -530,10 +520,6 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         bisecting_metrics_df = pd.DataFrame(
             generate_Bisecting_KMeans_clusters(bisec_data_df, cluster_iter, labels[LABELED][:, 1])[0],
             columns=METRICS_COLS)
-        # Spectral
-        spectral_metrics_df = pd.DataFrame(
-            generate_Spectral_clusters(spectral_data_df, cluster_iter, labels[LABELED][:, 1])[0],
-            columns=METRICS_COLS)
 
         plot_cluster_line_metrics(kmeans_metrics_df, "/kmeans/" + _name + "_kmeans_parameter_metrics", "Clusters",
                                   "KMeans Cluster Metrics")
@@ -542,9 +528,6 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
         plot_cluster_line_metrics(bisecting_metrics_df, "/bisecting/" + _name + "_bisecting_KMeans_parameter_metrics",
                                   "Iterations",
                                   "Bisecting KMeans Cluster Metrics")
-        plot_cluster_line_metrics(spectral_metrics_df, "/spectral/" + _name + "_spectral_parameter_metrics",
-                                  "Number of Neighbours",
-                                  "Spectral Cluster Metrics")
     # ________________________________________________________________________________________________________________________________________________
 
 
