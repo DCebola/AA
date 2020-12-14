@@ -91,9 +91,13 @@ def plot_cluster_line_metrics(_data, name, parameter, title):
     sns.lineplot(data=_data, x="x", y="y", hue="metric", palette=PALETTE[:_data["metric"].unique().size])
     sns.scatterplot(data=_data, x="x", y="y", hue="metric", legend=False,
                     palette=PALETTE[:_data["metric"].unique().size])
+
+    plt.plot(np.linspace(np.min(_data.iloc[:, 1].to_numpy()), np.max(_data.iloc[:, 1].to_numpy()), _data.iloc[:, 1].to_numpy().shape[0]),
+             np.zeros((_data.iloc[:, 1].to_numpy().shape[0],)), color="black",
+             linestyle='dashed')
     plt.xlabel(parameter)
     plt.ylabel("Score")
-    plt.ylim(0, 1)
+    plt.ylim(-1.1, 1.1)
     plt.savefig("plots/" + name + '.png', dpi=200, bbox_inches='tight')
     plt.close()
 
@@ -175,8 +179,8 @@ def cluster_eval(_feats, _predicted_labels, _true_labels, _x):
         ('Precision Score', _x, precision),
         ('Recall', _x, recall),
         ('F1-Measure', _x, f1),
-        ('Adjusted Random Score', _x, _adjusted_rand_score),
-        ('Random Index', _x, rand_index)
+        ('Adjusted Rand Index', _x, _adjusted_rand_score),
+        ('Rand Index', _x, rand_index)
     ]
 
 
@@ -193,8 +197,8 @@ def generate_KMeans_clusters(_data, n_clusters, _true_labels):
 def generate_Spectral_clusters(_data, n_iter, _true_labels):
     _metrics = []
     _clusters = []
-    for n in range(10, n_iter * 10 + 1, 10):
-        _clusters = SpectralClustering(n_clusters=3, n_init=n).fit_predict(_data.to_numpy())
+    for n in range(0, n_iter + 1):
+        _clusters = SpectralClustering(n_clusters=3, n_neighbors=n).fit_predict(_data.to_numpy())
         for m in cluster_eval(_data, _clusters, _true_labels, n):
             _metrics.append(m)
     return _metrics, _clusters
@@ -411,7 +415,7 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
     _5dists = np.sort(np.sort(np.linalg.norm(_feats - _feats[:, None], axis=-1), axis=-1)[::-1][:, 4])[::-1]
     valleys = find_peaks_cwt(_5dists * (-1), np.arange(1, 20))
     valleys_dists = _5dists[valleys]
-    best_eps = valleys_dists[1]
+    best_eps = valleys_dists[0]
     # Plotting 5 dists with best eps found
     plot_5dist(_5dists, valleys, "dbscan/" + _name + "_5-dists", "5 Distances")
 
@@ -517,7 +521,7 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
             columns=METRICS_COLS)
         # DBSCAN
         eps_range = []
-        for num in np.arange(0, best_eps, best_eps / cluster_iter):
+        for num in np.arange(0, best_eps, best_eps / (cluster_iter - 1)):
             eps_range.append(best_eps - num)
         eps_range.reverse()
         dbscan_metrics_df = pd.DataFrame(generate_DBSCAN_clusters(dbscan_data_df, eps_range, labels[LABELED][:, 1])[0],
@@ -539,7 +543,7 @@ def experiment(_name, _feats, _labels, feature_selection=False, corr_filter=Fals
                                   "Iterations",
                                   "Bisecting KMeans Cluster Metrics")
         plot_cluster_line_metrics(spectral_metrics_df, "/spectral/" + _name + "_spectral_parameter_metrics",
-                                  "KMeans Iterations",
+                                  "Number of Neighbours",
                                   "Spectral Cluster Metrics")
     # ________________________________________________________________________________________________________________________________________________
 
@@ -565,7 +569,6 @@ create_dir("plots/dbscan")
 create_dir("plots/bisecting")
 create_dir("plots/spectral")
 create_dir("filtered_images")
-# create_dir("clusters")
 
 # Uncomment to extract features of images where  the kernel was applied. (Note: data needs to be deleted before new write, else will be reused)
 """
@@ -580,7 +583,7 @@ for img in images[:]:
 # Uncomment which experiment to run
 
 original_feats = get_original_feats_data(images)
-# experiment("experiment", original_feats, labels, feature_selection=False, corr_filter=True, cluster_iter=10)
+experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=10)
 
 """
 for n in [10, 50, 250]:
