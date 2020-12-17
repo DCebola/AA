@@ -265,7 +265,7 @@ def get_original_feats_data(_images, kernel=False):
     if kernel:
         if path.exists("data/original/original_feats_kernel.p"):
             print("Loading features...")
-            _original_feats = pickle.load(open("data/original/original_feats.p", "rb"))
+            _original_feats = pickle.load(open("data/original/original_feats_kernel.p", "rb"))
             print("Loaded original features...")
         else:
             print("Extracting features...")
@@ -594,8 +594,8 @@ create_dir("plots/bisecting")
 create_dir("plots/spectral")
 create_dir("filtered_images")
 # Uncomment which experiment to run
-original_feats = get_original_feats_data(images, kernel=False)
-experiment("normalized", normalize(original_feats), labels, feature_selection=True, corr_filter=True, cluster_iter=0)
+# original_feats = get_original_feats_data(images, kernel=False)
+# experiment("normalized", normalize(original_feats), labels, feature_selection=False, corr_filter=False, cluster_iter=0)
 """
 # Implemented but as results were worse than with original images so we did not experiment further and just used feature selection. 
 # Due to time shortage, tests with kernel and pixel aggregation were not done but we expect, similarly, that it will not produce better results compared with
