@@ -56,7 +56,9 @@ DBSCAN only generated one cluster while K-Means generated 3. The clusters genera
 At most, biologists can manipulate the heuristic to try and tweak the desired final cluster metrics. We recommend that the biologist first try and apply a filter to the images with, for example, a gaussian kernel mask of 50x50pixels, so that the interior of the cells would have the most
 influence in the information extracted for the features. Only min-maxing parameters and feature values without proper selection of data to fit the algorithms might not be the best approach.
 
+kmeans_clusters.png
 kmeans_clusters.html
+dbscan_clusters.png
 dbscan_clusters.html
 
 Q7: Discuss advantages or problems with these two algorithms (K-Means and DBSCAN) for the purpose of helping biologists to organize these images, considering your theoretical knowledge of these algorithms as well as the results you obtained in your work.
