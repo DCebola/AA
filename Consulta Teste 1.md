@@ -9,22 +9,9 @@
 ## Logistic Regression
 
 > Regressão logística utiliza a função logistica como loss function para modelar a probabilidade de um exemplo pertencer a uma dada classe como função de um vetor de features. Para se maximizar esta probabilidade, recorrendo ao gradiente, minimiza-se a função logística. Assim é possível encontrar a maior likelihood e, por conseguinte, a melhor hipótese.
->
-> Suponha que tem um conjunto de dados com 1000 pontos do tipo (x, y) e quer ajustar um modelo de regressão para prever o valor contínuo de y  para novos exemplos com base nos valores de x. Quer seleccionar o melhor de vários modelos e precisa de uma estimativa do erro que em média  espera ter quando usar a sua hipótese final em exemplos novos. Explique  como procederia para resolver este problema. Deve focar os seguintes  aspectos, por ordem decrescente de prioridade:
->
-> - Como organiza este conjunto de dados em diferentes conjuntos, explicando porquê.
-> - Como selecciona o melhor modelo.
-> - Como obtém a hipótese final.
-> - Como obtém uma estimativa não enviesada do erro de previsão para exemplos novos.
-> - Qual a função de erro que vai usar, justificando a escolha.
-> - __[Not linearly separable]__ 
 
-> > - A Regressão Logística é um classificador linear mas pode ser usada  para separar correctamente classes que não são linearmente separáveis.  No entanto, isto pode levar a sobreajustamento (*overfitting*). Explique isto focando os seguintes aspectos por ordem decrescente de prioridade:
-> >   - Porque é que a Regressão Logística é uma regressão e qual o valor que tenta prever.
-> >   - Como se pode usar essa previsão para usar a Regressão Logística como um classificador.
-> >   - O que se tem de fazer para poder separar classes, que não são linearmente separáveis, com este classificador.
-> >   - O que é o sobreajustamento (*overfitting*) e como se pode  tentar mitigar isto na Regressão Logística assumindo que o modelo já  está determinado (não se pode escolher outro modelo).
->
+__[Not linearly separable]__ 
+
 > Expandir as dimensões das features dos dados permite a utilização de discriminantes lineares e a separação dos exemplos
 > em classes nestes feature spaces de maiores dimensões. O hiperplano que representa a boundary de decisão é depois novamente representado no
 > feature space com as dimensões originais.
@@ -84,20 +71,6 @@ __[McNemar's Test]__
 > Dadas estas propriedades, se o valor do rácio for superior a 3.84, é possível concluir com 95% de confiança que os classificadores têm
 > performances diferentes.
 
-
-
-Explique o que há de semelhante e diferente entre o Classificador de Bayes e o Classificador *Naïve* Bayes focando os seguintes aspectos por ordem decrescente de prioridade:
-
-- Em que se baseiam para atribuir cada exemplo a uma classe.
-- O que é que o Classificador *Naïve* Bayes assume para simplificar este cálculo.
-- Porque é que há vantagem em fazer a simplificação que o Classificador *Naïve* Bayes faz.
-- Explique como podemos criar um  Classificador *Naïve* Bayes paramétrico e um  Classificador *Naïve* Bayes não-paramétrico.
-
-- O que são vectores de suporte e onde é que a SVM tenta colocar o discriminante.
-- O que é e o faz o parâmetro C.
-- O que é o *kernel trick* e como permite classificar correctamente exemplos quando as classes não são linearmente separáveis.
-- Explique porque é que o uso do *kernel trick* pode agravar o sobreajustamento (*overfitting*).
-
 ## Perceptrons
 
 __[Treino] __
@@ -151,7 +124,7 @@ __[Overfit]__
 
 > Se um modelo está em overfit, o modelo ajustou-se demasiado aos dados de treino e é incapaz de generalizar.
 > A principal componente do erro é a variância.
-
+>
 > Escolha ótima é o modelo que minimize tanto a variância como o bias.
 
 ##  Bootstrap 
@@ -159,17 +132,9 @@ __[Overfit]__
 > Para estimar o bias e a variância do modelo é necessário que o modelo tenha sido treinado sobre diversos training sets.
 > Como normalmente só existe um training set, recorre-se a bootsrapping para gerar diversos subsets de treino através de um
 > sampling aleatório sobre o training set. Como se calcula o erro para cada hipótese usando as réplicas que não foram usadas para 
-> o seu treino, este calculo não é biased. Como os erros calculados para cada hipótese não são biased, o bias e a variância também não o serão.
-
-> Reduz a variância sem  aumentar o bias. Útil quando o base model tem variância alta e bias reduzido.
+> o seu treino, este calculo não é biased. Como os erros calculados para cada hipótese não são biased, o bias e a variância também não o serão.Reduz a variância sem  aumentar o bias. Útil quando o base model tem variância alta e bias reduzido.
 
 
-
-*Bagging* e *AdaBoost* são dois métodos usados para agregar hipóteses de forma a mitigar alguns problemas na previsão. Explique  estes métodos, as suas vantagens e em que situações devem ser usados  focando os seguintes aspectos por ordem decrescente de prioridade:
-
-- Como é que se obtém as diferentes hipóteses em *Bagging* e em *AdaBoost*.
-- Qual dos dois é mais adequado para usar com modelos instáveis, com muita variância, e porquê.
-- Porque é que o outro é adequado para modelos com um *bias* elevado.
 
 ## Ensemble 
 
@@ -193,8 +158,6 @@ __[BIAS]__
 		das estimativas do classificador resultante minimize o bias. Os pesos apenas podem diminuir.
 		Isto é concretizado treinando cada classificador com os mesmos dados de treino mas dando pesos diferentes a cada exemplo.
 		Os peso de exemplos mal classificados devem ser mais altos.  
-
-
 
 
 
