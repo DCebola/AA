@@ -130,20 +130,18 @@ Feature Selection é o processo de manter apenas as features adequadas, mantendo
 
 > A sequencia de estados mais provável dado as observações. 
 >
-> Knowing *A*,*B*,*π* we can also compute the most likely sequence of *x*1,...,*xt* given *y*1,...,yt
+> Conhecendo *A*,*B*,*π* é possível calcular a sequência de estados mais provável,  *x*1,...,*xt*,  dado as observações y*1,...,yt. Necessida de criar duas matrices *N*×*T*, onde se guardam as probabilidades dos caminhos mais prováveis de estados para o estado n∊N dadas as primeiras t∊T observações. Podem ser construídas por ordem, a partir do estado anterior
 >
-> - Two matrices of *N*×*T*
-> - These matrices can be built in order, from previous state
 
 ##### Baum-Welch algorithm
 
->Para treinar o modelo. Não garante otimalidade e pode entrar em overfit.
+>Caso particular de E.M usado para descobrir os parametros desconhecidos θ de uma HMM. Tira partido do alogritmo forward-backward para a fase de expectation
 >
->- Compute joint probability of hidden state and emissions so far at each time.
->- Compute probability of future emissions given hidden state at each time.
->- Compute probability hidden state at each time given all emissions.
->- Compute joint probability of consecutive hidden states at each time given all emissions.
->- Use this to find new parameter values
+>- Calcula-se a probabilidade conjunta de estado oculto e emissões até o momento, a cada momento.
+>- Calcula-se a probabilidade de emissões futuras, dado o estado oculto a cada momento.
+>- Calcula-se o estado oculto de probabilidade a cada momento, dadas todas as emissões.
+>- Calcule-se a probabilidade conjunta de estados ocultos consecutivos a cada vez, considerando todas as emissões.
+>- Use para encontrar novos valores de parâmetro
 
 ### Expectation-Maximization (EM)
 
@@ -181,10 +179,7 @@ Feature Selection é o processo de manter apenas as features adequadas, mantendo
 
 #### Divisive Clustering
 
-> Agglomerative clustering is a bottom-up approach that begins with singleton clusters and repeatedly
-> joins the best two clusters, according to the linkage method used, into a higher level cluster until all
-> elements are joined. The time complexity of agglomerative clustering is generally O(n 3 ), but can be
-> improved with linkage constraints.
+> Divisive clustering te uma abordagem top-down. Começa com um único cluster com todos os exemplos e, iterativamente, escolhe os melhores dois clusters que dividem os clusters originais. Termina quando o número de clusters é o desejado, ou, no limite, quando só existem singleton clusters, com um único exemplo cada.  O(2 ^n)
 
 ##### Bysecting K-Means
 
@@ -195,10 +190,7 @@ Feature Selection é o processo de manter apenas as features adequadas, mantendo
 
 #### Agglomerative Clustering
 
->Divisive clustering is a top-down approach that begins with a single cluster containing all examples
->and iteratively picks a cluster to split and separates it into smaller clusters until some number of clusters
->is reached. The theoretical time complexity for divisive clustering is O(2 n ) for an exhaustive search
->and this approach needs an additional clustering algorithm for splitting each cluster.
+>Agglomerative clustering tem uma abordagem bottom-up. Começa com vários cluster singleton, com um único exemplo, e, iterativamente, vai juntando os dois melhores clusters, dado o linkage method escolhido. Quando todos os clusters estão únidos, termina.  O(n^3)
 
 ### Fuzzy Clustering
 
@@ -210,24 +202,12 @@ Feature Selection é o processo de manter apenas as features adequadas, mantendo
 
 ### Manifold Learning
 
-> Mathematically, an n-dimensional manifold, or n-manifold, is a set of points such that each point and
-> its neighbours form an approximately Euclidean space. In machine learning, this is a useful concept because it is often the case that data do not span all possible combinations of feature values. Thus, data sets are usually sets of points that can be approximated by manifolds fewer dimensions than the number of attributes. Finding these manifolds is a useful way of reducing the dimensionality of our data.
+> Uma n-dimensional manifold, ou n-manifold, consiste num set de pontos tais que cada ponto e os seus vizinhos formam, aproximadamente, um espaço euclideano. Isto é útil em machine learning no sentido de que sets de dado normalmente são conjuntos de pontos que podem ser aproximados por manifolds com n dimensões a menos que as features originais. Descobrir estas n-manifolds permite reduzir a dimensionalidade dos dados.
 
 #### t-SNE
 
-> The t-distributed stochastic neighbor embedding algorithm (t-SNE) projects the data into lower
-> dimensions – typically two dimensions, for visualization – while trying to keep the distribution of
-> distances between points approximately analogous. (...)
+> O método de t-distributed stochastic neighbor embedding algorithm (t-SNE) consiste em projetar dados em dimensões mais reduzidas que as originais, tentanto conservar a distribuição das distâncias entre os pontos de forma análoga. Para tal, dispõe-se os pontos no espaço de features mais reduzido e, com base na distribuição original  das suas distâncias, atraiem-se e repelem-se os pontos de modo a formar grupos. A atração e repulsão dos pontos é em função da distribuição das distâncias originais dos pontos, por exemplo, considerando uma distribuição t-student, de modo a que os pontos conservem as distâncias originais, analogamente, nas novas dimensões mais reduzidas.
 
 #### Isomap
 
-> The Isomap algorithm tries to create a low-dimensional manifold from high-dimensional data
-> while preserving as much as possible the distances between the nearest neighbours.
->
-> 1. Create a k-nearest neighbours graph connecting each point to its k-nearest neighbours.
-> 2. Compute pairwise distances for all pairs of points by adding the distances of all steps in the
-> shortest path between two points on the k-nearest neighbours graph. This is an estimate of the
-> distance between points in the manifold.
-> 3. Compute the distribution of the points in the lower-dimensional manifold with multidimensional
-> scaling, which finds an embedding that preserves as much as possible the distances between pairs
-> of point
+> O algoritmo de Isomap tenta criar manifolds de dimensões mais reduzidas dos dados, tentando conservar a distâncias entre k vizinhos mais próximos. Primeiro, cria um k-nn grafo que conecta cada ponto aos seus k vizinhos mais próximos. Em segundo, calcula as distâncias dos pares de pontos para todos os pontos, tendo por base o caminho mais curto entre os pontos. Finalmente, calcula uma distribuição de pontos no novo espaço de features mais reduzido, tentando conservar ao máximo as distâncias entre todos pares de pontos.
